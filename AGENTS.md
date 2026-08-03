@@ -140,3 +140,58 @@ Docs accompany every code change: update affected README/JSDoc contracts togethe
 ## Vendoring policy
 
 `vendor/` packages are pinned source copies (manifest with upstream SHAs in [vendor/README.md](vendor/README.md)). Update via the sync procedure there; re-apply or retire the logged local modifications; rerun `pnpm run test && pnpm run build`.
+
+---
+
+## 本机部署与 Issue 提交流程（ShiroEirin 私有配置）
+
+> 以下内容为内测参与者 ShiroEirin 的**私有部署配置**，仅存在于私有镜像仓库，**禁止回传上游**（dsh2026）。
+
+### 仓库拓扑
+
+| remote     | URL                                               | 用途                                  |
+| ---------- | ------------------------------------------------- | ------------------------------------- |
+| `origin`   | https://github.com/dsh2026/test-ShiroEirin.git    | 上游官方（只读，已禁用 fork）         |
+| `fork`     | https://github.com/ShiroEirin/test-ShiroEirin.git | 私有镜像（**唯一可写远程**，private） |
+| Issue 仓库 | https://github.com/dsh2026/issues                 | 内测问题反馈（用 `gh issue create`）  |
+
+### 本机环境（项目仅支持 WSL/Linux）
+
+- 系统：WSL2 Debian 13 (trixie)，用户 `aikun`
+- Node：v22.23.2（NodeSource 系统安装，**非 nvm** —— 已通过根 package.json 的 `unrun@^0.3.1` 修复 tsdown 可选 peer 缺失问题，无需再动）
+- pnpm：11.7.0（corepack 激活）
+- 网络：WSL mirrored 模式，代理 `127.0.0.1:10809`（verge-mihomo），apt/npm/pnpm 均已走代理
+- 本仓库位置：Windows `H:\github\deepseek\test-ShiroEirin` ⇄ WSL `/mnt/h/github/deepseek/test-ShiroEirin`
+
+### 部署命令（WSL 内执行）
+
+```sh
+git clone https://github.com/ShiroEirin/test-ShiroEirin.git && cd test-ShiroEirin
+DSH_REPO=https://github.com/ShiroEirin/test-ShiroEirin.git DSH_REF=snapshots/20260803T142347Z-25b2ad4f67 scripts/install.sh
+```
+
+- install.sh 会交互提示输入 DeepSeek API Key，写入 `~/.dsh/.env`（已被 .gitignore 拦截，永不入库）
+- 产物：staging worktree `~/.dsh/source/staging-<时间戳>`，`current` 符号链接指向它，`~/.local/bin/dsh` 为命令入口
+- 重新部署（升级）：重跑上述命令即可，会新增 staging worktree 并重指 `current`
+
+### Issue 自动提交流程（agent 遵循）
+
+目标仓库：`dsh2026/issues`，统一使用 GitHub CLI（Windows 侧已登录 ShiroEirin，token 含 repo/workflow 权限）：
+
+```sh
+gh issue create --repo dsh2026/issues --title "<标题>" --body "<正文>"
+```
+
+提交规则：
+
+1. **必填信息**：当前 staging 提交哈希 `git -C ~/.dsh/source/current rev-parse HEAD`、系统环境（WSL2 Debian 13 / Node 22.23.2 / pnpm 11.7.0）、复现步骤、期望行为 vs 实际行为、相关日志
+2. **标题格式**：`类型: 简述`（类型取 bug / feature / docs / question）
+3. **正文结构**：环境 → 复现步骤 → 期望/实际 → 日志/截图
+4. **安全红线**：正文严禁出现任何 API Key、Token、密钥；发现即脱敏后再提交
+5. 提交成功后把 issue URL 回报用户确认
+
+### 更新与维护
+
+- 上游更新：`git fetch origin && git rebase origin/snapshots/20260803T142347Z-25b2ad4f67`，然后 `git push fork <分支>`
+- 所有本地修改只提交到 `fork`，**禁止 push 到 origin**（上游无写权限且不应被污染）
+- 若上游日后修复了 unrun 问题，可在 fork 上提交移除根 package.json 的 unrun devDependency
