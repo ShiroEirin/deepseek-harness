@@ -13,6 +13,7 @@ import { canonicalHeader, headerEquals, isSurfaceEvent } from '@deepseek-ai/dsh-
 // Type-only: resolves the optional projection registry Context seam.
 import type {} from '@deepseek-ai/dsh-session-projection'
 import type {
+  ReplayDegradeKind,
   TokenMeasurement,
   TokenMeasurementBaseline,
   TokenMeterConfig,
@@ -38,6 +39,8 @@ interface ReplayState {
   surfaceTokens: number
   stepStart: { turn: number; step: number; surfaceTokens: number } | undefined
   anchor: MeasurementAnchor | undefined
+  /** First tolerated boundary/provenance fault on a torn session; undefined while healthy. */
+  degraded: { seq: number; kind: ReplayDegradeKind } | undefined
 }
 
 /** Sum disjoint provider usage buckets without double-counting reasoning output. */
@@ -143,6 +146,7 @@ export class TokenMeterService extends Service {
       totalTokens: Math.max(0, baseline.tokens + surfaceDeltaTokens),
       surfaceTokens: state.surfaceTokens,
       nodes: state.surface,
+      degraded: state.degraded,
     }))
   }
 
@@ -167,6 +171,7 @@ export class TokenMeterService extends Service {
         surfaceTokens: 0,
         stepStart: undefined,
         anchor: undefined,
+        degraded: undefined,
       }
       this.states.set(session, state)
     }
@@ -196,9 +201,11 @@ export class TokenMeterService extends Service {
         break
       case 'step/start':
         if (state.stepStart !== undefined) {
-          throw new Error(
-            `token meter: step/start at seq ${event.seq} arrived before turn ${state.stepStart.turn}/step ${state.stepStart.step} ended`,
-          )
+          // Torn sessions may reopen a step before the earlier one closed
+          // (upstream issue #88): keep the live boundary, record the first
+          // degradation, and continue instead of failing the whole replay.
+          state.degraded ??= { seq: event.seq, kind: 'step/start' }
+          break
         }
         nextStepStart = { ...event.data, surfaceTokens: state.surfaceTokens }
         break
@@ -206,7 +213,11 @@ export class TokenMeterService extends Service {
         if (state.stepStart === undefined
           || state.stepStart.turn !== event.data.turn
           || state.stepStart.step !== event.data.step) {
-          throw new Error(`token meter: step/end at seq ${event.seq} has no matching step/start boundary`)
+          // Torn sessions may carry a trailing step/end without the matching
+          // start (upstream issue #88): record the first degradation and
+          // continue instead of failing the whole replay.
+          state.degraded ??= { seq: event.seq, kind: 'step/end' }
+          break
         }
         nextStepStart = undefined
         break
@@ -223,91 +234,47 @@ export class TokenMeterService extends Service {
       if (stepStart === undefined
         || stepStart.turn !== event.data.turn
         || stepStart.step !== event.data.step) {
-        throw new Error(`token meter: assistant/message at seq ${event.seq} has no matching step/start boundary`)
-      }
-
-      // assistant/message is surface-mandatory at every append/seed boundary.
-      // oxlint-disable-next-line typescript/no-non-null-assertion
-      const eventTokens = surface!.tokens
-      if (event.data.usage !== undefined && nextHeader !== undefined) {
-        const providerAssistantTokens = this._estimateProviderAssistant(
-          session,
-          event,
-          eventTokens,
-        )
-        const anchorSurfaceTokens = stepStart.surfaceTokens + providerAssistantTokens
-        const providerTokens = usageTokens(event.data.usage)
-        const estimatedAnchorTokens = estimateHeader(nextHeader) + anchorSurfaceTokens
-        nextAnchor = {
-          header: nextHeader,
-          surfaceTokens: anchorSurfaceTokens,
-          // Signed heuristic deltas remain conservative only from an anchor
-          // that is at least as large as the matching full heuristic price.
-          baseline: providerTokens >= estimatedAnchorTokens
-            ? { kind: 'usage', tokens: providerTokens, usage: event.data.usage }
-            : { kind: 'estimated', tokens: estimatedAnchorTokens },
-        }
+        // Torn sessions may drop or duplicate a step boundary (upstream
+        // issue #88): keep the last healthy anchor, still fold this message's
+        // surface, and record the first degradation instead of failing.
+        state.degraded ??= { seq: event.seq, kind: 'assistant/message' }
       } else {
-        const anchorSurfaceTokens = stepStart.surfaceTokens + eventTokens
-        nextAnchor = {
-          header: nextHeader,
-          surfaceTokens: anchorSurfaceTokens,
-          baseline: {
-            kind: 'estimated',
-            tokens: estimateHeader(nextHeader) + anchorSurfaceTokens,
-          },
+        // assistant/message is surface-mandatory at every append/seed boundary.
+        // oxlint-disable-next-line typescript/no-non-null-assertion
+        const eventTokens = surface!.tokens
+        if (event.data.usage !== undefined && nextHeader !== undefined) {
+          const providerAssistantTokens = this._estimateProviderAssistant(
+            session,
+            event,
+            eventTokens,
+          )
+          if (providerAssistantTokens === null) {
+            // Torn provenance cannot anchor a signed baseline; fall back to
+            // the durable heuristic price and record the first degradation.
+            state.degraded ??= { seq: event.seq, kind: 'provenance' }
+          }
+          const anchorSurfaceTokens = stepStart.surfaceTokens
+            + (providerAssistantTokens ?? eventTokens)
+          const providerTokens = usageTokens(event.data.usage)
+          const estimatedAnchorTokens = estimateHeader(nextHeader) + anchorSurfaceTokens
+          nextAnchor = {
+            header: nextHeader,
+            surfaceTokens: anchorSurfaceTokens,
+            // Signed heuristic deltas remain conservative only from an anchor
+            // that is at least as large as the matching full heuristic price.
+            baseline: providerTokens >= estimatedAnchorTokens
+              ? { kind: 'usage', tokens: providerTokens, usage: event.data.usage }
+              : { kind: 'estimated', tokens: estimatedAnchorTokens },
+          }
+        } else {
+          const anchorSurfaceTokens = stepStart.surfaceTokens + eventTokens
+          nextAnchor = {
+            header: nextHeader,
+            surfaceTokens: anchorSurfaceTokens,
+            baseline: {
+              kind: 'estimated',
+              tokens: estimateHeader(nextHeader) + anchorSurfaceTokens,
+            },
+          }
         }
       }
-    }
-
-    state.header = nextHeader
-    state.stepStart = nextStepStart
-    if (surface !== undefined) {
-      state.surface = surface.nodes
-      state.surfaceTokens += surface.deltaTokens
-    }
-    state.anchor = nextAnchor
-  }
-
-  /**
-   * Reassemble provider output from exact chunk provenance for a usage anchor.
-   * Missing legacy provenance conservatively treats the durable output as the
-   * provider output; explicit empty provenance prices a known empty stream.
-   */
-  private _estimateProviderAssistant(
-    session: Session,
-    event: SessionEvent<'assistant/message'>,
-    durableEventTokens: number,
-  ): number {
-    const sourceSeqs = event.sourceEventSeqs
-    if (sourceSeqs === undefined) return durableEventTokens
-
-    const assembler = new BlockAssembler()
-    const seen = new Set<number>()
-    for (const seq of sourceSeqs) {
-      if (seq >= event.seq) {
-        throw new Error(`token meter: assistant/message at seq ${event.seq} source seq ${seq} is not earlier`)
-      }
-      if (seen.has(seq)) {
-        throw new Error(`token meter: assistant/message at seq ${event.seq} repeats source seq ${seq}`)
-      }
-      seen.add(seq)
-      // Session construction validates contiguous seqs, and the explicit
-      // earlier-than-assistant check above therefore guarantees existence.
-      const source = session.events[seq]
-      // oxlint-disable-next-line typescript/no-non-null-assertion
-      const sourceEvent = source!
-      if (sourceEvent.type !== 'assistant/chunk') {
-        throw new Error(`token meter: assistant/message at seq ${event.seq} source seq ${seq} is not assistant/chunk`)
-      }
-      if (sourceEvent.data.turn !== event.data.turn || sourceEvent.data.step !== event.data.step) {
-        throw new Error(`token meter: assistant/message at seq ${event.seq} source seq ${seq} belongs to another step`)
-      }
-      assembler.push(sourceEvent.data.chunk)
-    }
-    const providerContent = assembler.blocks()
-    return providerContent.length === 0 ? 0 : estimateContent(providerContent) + ROLE_OVERHEAD
-  }
-}
-
-export default TokenMeterService
