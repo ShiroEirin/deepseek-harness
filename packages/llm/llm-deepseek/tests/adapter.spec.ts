@@ -689,6 +689,16 @@ describe('plugin registration and config', () => {
     },
   )
 
+  it('treats a whitespace-only apiKey as absent at the resolver boundary', () => {
+    // A spaces-only key must fall through to the apiKeyEnv resolution instead
+    // of shipping `Authorization: Bearer   ` into a 401 (#210).
+    expect('apiKey' in resolveAdapterOptions({ apiKey: '   ' })).toBe(false)
+  })
+
+  it('trims surrounding whitespace from a literal apiKey at the resolver boundary', () => {
+    expect(resolveAdapterOptions({ apiKey: '  sk-test  ' }).apiKey).toBe('sk-test')
+  })
+
   it('accepts disabled thinking with off at the resolver boundary', async () => {
     const adapter = adapterOf({ thinking: 'disabled', reasoningEffort: 'off' })
     await expect(adapter.resolveModel('deepseek-official', 'pass-through')).resolves.toMatchObject({

@@ -175,7 +175,7 @@ export function resolveAdapterOptions(config: Config): ResolvedDeepSeekOptions {
     )
   }
   return {
-    ...config.apiKey !== undefined && config.apiKey.length > 0 ? { apiKey: config.apiKey } : {},
+    ...config.apiKey !== undefined && config.apiKey.trim().length > 0 ? { apiKey: config.apiKey.trim() } : {},
     apiKeyEnv: credentialRef(config.apiKeyEnv ?? DEFAULT_API_KEY_ENV),
     baseURL: config.baseURL ?? process.env.DEEPSEEK_BASE_URL ?? PUBLIC_BASE_URL,
     defaults: {
