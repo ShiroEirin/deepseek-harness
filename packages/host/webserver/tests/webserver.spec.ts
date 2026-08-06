@@ -215,7 +215,8 @@ describe('real Loader composition', () => {
         failure = error
       }
       second = context
-      expect(String(failure)).toMatch(/failed to apply loader entry.*EADDRINUSE/)
+      expect(String(failure)).toMatch(/webserver: port .* is already in use/)
+      expect(String(failure)).toContain(String(takenPort))
     } finally {
       await second?.fiber.dispose()
       context = first
