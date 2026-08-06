@@ -62,9 +62,9 @@ async function loadComposition(port = 0): Promise<Context> {
 }
 
 /** GET (by default) one path against the running server; returns status plus a body prefix. */
-async function request(port: number, path: string, init?: RequestInit): Promise<{ status: number; body: string }> {
+async function request(port: number, path: string, init?: RequestInit): Promise<{ status: number; body: string; headers: Record<string, string> }> {
   const response = await fetch(`http://127.0.0.1:${String(port)}${path}`, init)
-  return { status: response.status, body: (await response.text()).slice(0, 80) }
+  return { status: response.status, body: (await response.text()).slice(0, 80), headers: Object.fromEntries(response.headers) }
 }
 
 /** Open one raw upgrade request and return after the handler writes its response. */

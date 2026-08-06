@@ -73,12 +73,13 @@ async function loadComposition(): Promise<Context> {
 }
 
 /** GET (by default) one path against the running server; returns status, content-type, and a body prefix. */
-async function request(port: number, path: string, init?: RequestInit): Promise<{ status: number; type: string | null; body: string }> {
+async function request(port: number, path: string, init?: RequestInit): Promise<{ status: number; type: string | null; body: string; headers: Record<string, string> }> {
   const response = await fetch(`http://127.0.0.1:${String(port)}${path}`, init)
   return {
     status: response.status,
     type: response.headers.get('content-type'),
     body: (await response.text()).slice(0, 80),
+    headers: Object.fromEntries(response.headers),
   }
 }
 
@@ -111,6 +112,12 @@ describe('real Loader composition', () => {
     }
     untap()
     expect((await request(port, '/')).body).not.toContain('__T__')
+
+    // The SPA index must never be cached: a desktop-shell restart on a new
+    // origin (random port) or a cleared site would otherwise pin a stale boot
+    // manifest and fail to resume the last session (#309/#150).
+    expect((await request(port, '/')).headers['cache-control']).toBe('no-cache')
+    expect((await request(port, '/no/such/route')).headers['cache-control']).toBe('no-cache')
 
     // Traversal outside the dist root is 403; non-GET/HEAD is 405.
     expect((await request(port, '/..%2f..%2fetc%2fpasswd')).status).toBe(403)

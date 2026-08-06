@@ -67,7 +67,7 @@ export async function serveStatic(
   }
   const serveIndex = async (): Promise<void> => {
     const body = await renderIndex()
-    res.writeHead(200, { 'content-type': MIME['.html'] })
+    res.writeHead(200, { 'content-type': MIME['.html'], 'cache-control': 'no-cache' })
     res.end(body)
   }
   if (target === distRoot || target === distIndex) {
