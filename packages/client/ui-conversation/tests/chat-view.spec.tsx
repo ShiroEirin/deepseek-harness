@@ -975,6 +975,50 @@ describe('ChatView', () => {
     expect(observe).toHaveBeenCalledTimes(1)
   })
 
+  it('a small upward wheel inside the follow threshold survives stream growth (issue #220)', () => {
+    let notify: (() => void) | undefined
+    const observe = vi.fn()
+    class ResizeObserverStub {
+      constructor(callback: ResizeObserverCallback) {
+        notify = () => { callback([], this as unknown as ResizeObserver) }
+      }
+
+      observe = observe
+      disconnect = vi.fn()
+    }
+    vi.stubGlobal('ResizeObserver', ResizeObserverStub)
+    const h = makeHarness({ nodes: [user(1, 'q'), assistant(2, 'a')] })
+    const view = render(<h.ChatView {...h.props} />)
+    const scroller = view.container.querySelector('[class*="scroll"]') as HTMLDivElement
+    Object.defineProperty(scroller, 'scrollHeight', { value: 1_000, writable: true })
+    Object.defineProperty(scroller, 'clientHeight', { value: 300, writable: true })
+    scroller.scrollTop = 700
+    fireEvent.scroll(scroller)
+    // Reader wheels up 10px: inside FOLLOW_THRESHOLD (24) the chrome stays
+    // pinned, but follow must disarm so the next streamed chunk cannot yank
+    // the viewport back to the floor (upstream issue #220).
+    readerScroll(scroller, 690)
+    expect(view.queryByLabelText('回到底部')).toBeNull()
+    Object.defineProperty(scroller, 'scrollHeight', { value: 1_200, writable: true })
+    act(() => { notify?.() })
+    expect(scroller.scrollTop).toBe(690)
+  })
+
+  it('a small upward wheel survives the next streamed node (issue #220, flow-tip path)', () => {
+    const h = makeHarness({ nodes: [user(1, 'q'), assistant(2, 'a')] })
+    const view = render(<h.ChatView {...h.props} />)
+    const scroller = view.container.querySelector('[class*="scroll"]') as HTMLDivElement
+    Object.defineProperty(scroller, 'scrollHeight', { value: 1_000, writable: true })
+    Object.defineProperty(scroller, 'clientHeight', { value: 300, writable: true })
+    scroller.scrollTop = 700
+    fireEvent.scroll(scroller)
+    readerScroll(scroller, 690)
+    // Next streamed node moves the flow-tip signature; follow is disarmed so
+    // the layout effect must not re-pin the viewport.
+    act(() => { h.set({ nodes: [user(1, 'q'), assistant(2, 'a'), assistant(3, 'b')] }) })
+    expect(scroller.scrollTop).toBe(690)
+  })
+
   it('entering the at-bottom threshold does not snap the remaining scroll distance', () => {
     const h = makeHarness({ nodes: [user(1, 'q'), assistant(2, 'a')] })
     const view = render(<h.ChatView {...h.props} />)
