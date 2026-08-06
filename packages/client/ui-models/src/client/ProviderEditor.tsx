@@ -163,7 +163,7 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
 
   const stringAt = (source: unknown, key: string): string | undefined => {
     const value = getPath(source, [key])
-    return typeof value === 'string' && value.length > 0 ? value : undefined
+    return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined
   }
   const setField = (key: string, next: string | undefined): void => {
     setDraft(current => next === undefined ? deletePath(current, [key]) : setPath(current, [key], next))
@@ -226,8 +226,8 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
           : response.result.error.message
       }
     }
-    if (keyDraft.length > 0) {
-      const stored = await api.credentials.set({ ref: keyRef, value: keyDraft })
+    if (keyDraft.trim().length > 0) {
+      const stored = await api.credentials.set({ ref: keyRef, value: keyDraft.trim() })
       if (!stored.result.ok) return stored.result.error.message
     }
     setKeyDraft('')

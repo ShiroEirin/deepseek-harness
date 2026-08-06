@@ -727,6 +727,36 @@ describe('ModelsSection', () => {
     expect(baseURL.value).toBe('')
   })
 
+  it('does not store a whitespace-only key draft', async () => {
+    // The regression: a spaces-only key passed the `length > 0` gate and was
+    // written to credentials, later surfacing as a 401 at request time (#266).
+    const { face, set } = scriptedFace()
+    const bare: SettingsNamespaceView = {
+      ns: 'llm-deepseek',
+      schema: JSON.parse(JSON.stringify(DeepSeekConfig.toJSON())) as unknown,
+      value: {},
+      applies: 'live',
+      secrets: [],
+      revision: 0,
+    }
+    const { ProviderEditor } = await import('../src/client/ProviderEditor.tsx')
+    render(<ProviderEditor
+      provider="deepseek-official"
+      displayName="DeepSeek"
+      namespace={bare}
+      settingsPath={[]}
+      api={face as never}
+      t={t}
+      readOnly={false}
+      onClose={() => {}}
+    />)
+    fireEvent.click(screen.getByText(en.customized))
+    const key = screen.getByLabelText<HTMLInputElement>(en.keyInput)
+    fireEvent.change(key, { target: { value: '   ' } })
+    fireEvent.click(screen.getByText(en.apply))
+    await waitFor(() => { expect(set).not.toHaveBeenCalled() })
+  })
+
   it('rejects an invalid draft before writing', async () => {
     const { update } = await mountSection()
     fireEvent.click(screen.getByText(en.customized))
