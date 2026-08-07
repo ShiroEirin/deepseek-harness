@@ -85,6 +85,15 @@ class ObservedStateGate {
     const owner = this.owner(actor)
     if (owner) { this.set(owner, target.targetKey, version) }
   }
+
+  /** Drop this owner's observation of a target after a failed read (FS_NOT_FOUND /
+   *  not a regular file, e.g. after an external delete): the stale prior version must
+   *  not keep the next write looping on replaceIfVersion. */
+  clearTarget(target: FsTarget, actor: object | undefined): void {
+    const owner = this.owner(actor)
+    if (!owner) return
+    this.observed.get(owner)?.delete(target.targetKey)
+  }
 }
 
 /** Cordis plugin name used by loader diagnostics. */
@@ -118,5 +127,11 @@ export function apply(ctx: Context): void {
   // emit does not await promises. WeakMap.set satisfies that contract.
   ctx.on('fs/observed', (target, version, actor) => {
     gate.observe(target, version, actor)
+  })
+
+  // fs/observed-clear: drop this owner's stale observation after a failed read so the
+  // next write decides createIfAbsent instead of replaceIfVersion(stale) forever.
+  ctx.on('fs/observed-clear', (target, actor) => {
+    gate.clearTarget(target, actor)
   })
 }

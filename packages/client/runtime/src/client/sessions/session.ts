@@ -683,11 +683,11 @@ export class Session implements SessionFace {
    *  raw range, which is what lets the transcript render every event between its ends and lets a
    *  compaction checkpoint find its own provenance. */
   private acceptLiveEvent(event: SessionEvent, view?: ToolEventView): void {
-    if (this.openState === 'loading' || this.stitching) {
+    if (this.openState === 'loading' || this.stitching || this.openState === 'cold') {
       this.liveBuffer.push({ event, view })
       return
     }
-    if (this.openState !== 'open') return // cold/error: no window upkeep (history fully backfills on open)
+    if (this.openState !== 'open') return // error: no window upkeep (history fully backfills on open)
     const tailSeq = this.windowTailSeq()
     if (tailSeq !== null && event.seq > tailSeq + 1) {
       this.liveBuffer.push({ event, view })

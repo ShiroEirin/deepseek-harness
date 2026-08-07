@@ -378,6 +378,23 @@ describe('compactNow through the real loop', () => {
 })
 
 describe('compactNow transaction and failure classification', () => {
+  it('rejects through the promise when the signal is already aborted (never throws synchronously)', async () => {
+    const { compact } = detachedService()
+    const session = Session.create(SessionId('empty'))
+    const agent = fakeAgent(session, () => () => {})
+    const aborted = new AbortController()
+    aborted.abort()
+    let threw = false
+    let promise: Promise<unknown> | undefined
+    try {
+      promise = compact.compactNow(agent, aborted.signal)
+    } catch {
+      threw = true
+    }
+    expect(threw).toBe(false)
+    await expect(promise).rejects.toMatchObject({ name: 'AbortError' })
+  })
+
   it('returns null without writing a bracket for history that cannot be compacted', async () => {
     const { compact } = detachedService()
     const session = Session.create(SessionId('empty'))
@@ -698,12 +715,16 @@ describe('compactNow transaction and failure classification', () => {
       controller.abort(reason)
 
       let thrown: unknown
+      let pending: Promise<unknown> | undefined
       try {
-        void compact.compactNow(agent, controller.signal)
+        pending = compact.compactNow(agent, controller.signal)
       } catch (error: unknown) {
         thrown = error
       }
-      expect(thrown).toBe(reason)
+      // #369: compactNow must never throw synchronously; the pre-aborted signal
+      // surfaces as an exact rejection so callers can attach .catch().
+      expect(thrown).toBeUndefined()
+      await expect(pending).rejects.toBe(reason)
       expect(reserve).not.toHaveBeenCalled()
       expect(measure).not.toHaveBeenCalled()
       expect(compact.calls).toHaveLength(0)

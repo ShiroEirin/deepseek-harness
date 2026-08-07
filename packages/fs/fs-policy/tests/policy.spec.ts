@@ -67,6 +67,15 @@ describe('write-intent decision', () => {
     ctx.emit('fs/observed', target('a.txt'), FsVersion('v7'), exec)
     expect(await writeIntent(ctx, target('a.txt'), exec)).toEqual({ kind: 'replaceIfVersion', version: 'v7' })
   })
+
+  it('observed-clear drops the observation so the next write decides createIfAbsent', async () => {
+    const { ctx } = await setup()
+    const exec = ownerExec({})
+    ctx.emit('fs/observed', target('a.txt'), FsVersion('v7'), exec)
+    expect(await writeIntent(ctx, target('a.txt'), exec)).toEqual({ kind: 'replaceIfVersion', version: 'v7' })
+    ctx.emit('fs/observed-clear', target('a.txt'), exec)
+    expect(await writeIntent(ctx, target('a.txt'), exec)).toEqual({ kind: 'createIfAbsent' })
+  })
 })
 
 describe('edit-intent decision', () => {

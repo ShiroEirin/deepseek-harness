@@ -115,6 +115,26 @@ describe('default deployment (with dsh-fs-policy)', () => {
       expect(text(result)).toContain('3: three')
       expect(text(result)).toContain('(Showing lines 2-3 of 4. Use offset=4 to continue.)')
     })
+
+    it('recreates a file deleted externally after a failed read (no stale loop)', async () => {
+      const path = 'gone.txt'
+      await call('write', { file_path: path, content: 'original' })
+      // Observation recorded by the successful read.
+      expect((await call('read', { file_path: path })).isError).toBe(false)
+      await rm(join(dir, path)) // external delete
+      // The guarded write against the stale observation still fails once (provider semantics kept).
+      let result = await call('write', { file_path: path, content: 'reborn' })
+      expect(result.isError).toBe(true)
+      expect(result.error).toMatchObject({ info: { code: 'FS_STALE_VERSION' } })
+      // The failed read invalidates the stale observation...
+      result = await call('read', { file_path: path })
+      expect(result.isError).toBe(true)
+      expect(result.error).toMatchObject({ info: { code: 'FS_NOT_FOUND' } })
+      // ...so the retry decides createIfAbsent and recreates the file instead of looping.
+      result = await call('write', { file_path: path, content: 'reborn' })
+      expect(result.isError).toBe(false)
+      expect(await readFile(join(dir, path), 'utf8')).toBe('reborn')
+    })
   })
 
   describe('edit → disk', () => {

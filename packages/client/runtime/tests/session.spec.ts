@@ -909,14 +909,23 @@ describe('remaining branches', () => {
     expect(session.getSnapshot().removed).toBe(true)
   })
 
-  it('drops live events while cold/error (no window upkeep)', async () => {
+  it('buffers live events while cold and drops them once error (no window upkeep)', async () => {
     const { api, session } = makeSession()
     session.handleMuxEnvelope('r' as never, { type: 'session/event', sessionId: SID, event: ev.user(0, '冷态帧') })
-    expect(session.getSnapshot().nodes).toEqual([])
+    expect(session.getSnapshot().nodes).toEqual([]) // buffered for stitching, not yet visible
     api.onHistory = () => Promise.resolve(err({ code: 'internal', message: 'x', details: {} }))
-    await session.open()
+    await session.open() // open fails → error: the buffer is never stitched
     session.handleMuxEnvelope('r' as never, { type: 'session/event', sessionId: SID, event: ev.user(0, '错态帧') })
-    expect(session.getSnapshot().nodes).toEqual([])
+    expect(session.getSnapshot().nodes).toEqual([]) // error: still dropped (no window to stitch into)
+  })
+
+  it('stitches live frames buffered while cold once open succeeds (reconnect window)', async () => {
+    const { api, session } = makeSession()
+    api.onHistory = () => histResponse(plainTurn(0, 0, '早', '安'))
+    // A frame lands before open — the cold window — and must be stitched after install.
+    session.handleMuxEnvelope('r' as never, { type: 'session/event', sessionId: SID, event: ev.user(9, '重连帧') })
+    await session.open()
+    expect(session.getSnapshot().nodes.map(n => n.seq)).toContain(9)
   })
 
   it('repairGap failure logs and clears stitching; concurrent gaps coalesce into one repair', async () => {

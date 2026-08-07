@@ -363,10 +363,14 @@ export class BasicCompactService extends CompactService {
    * @param signal - cancellation scoped to this compaction request.
    * @returns the committed result, or `null` when no safe useful range exists.
    */
-  override compactNow(agent: Agent, signal: AbortSignal): Promise<CompactionResult | null> {
+  override async compactNow(agent: Agent, signal: AbortSignal): Promise<CompactionResult | null> {
     signal.throwIfAborted()
+    // Start maintenance synchronously so a busy/idle startup failure is classified here;
+    // then await the returned promise so inner classified errors (cancelled / commit /
+    // summary / AbortError) surface unchanged instead of being re-wrapped as busy.
+    let run: Promise<CompactionResult | null>
     try {
-      return agent.runMaintenance(async (agentSignal) => {
+      run = agent.runMaintenance(async (agentSignal) => {
         const operationSignal = AbortSignal.any([agentSignal, signal])
         try {
           operationSignal.throwIfAborted()
@@ -410,6 +414,7 @@ export class BasicCompactService extends CompactService {
         { cause: error },
       )
     }
+    return await run
   }
 
   /** Bind the effective token meter and dynamically dispatched summarizer hook. */

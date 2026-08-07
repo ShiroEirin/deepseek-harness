@@ -141,8 +141,17 @@ export function applyReadTool(ctx: Context, caps: ReadToolCaps): void {
       // One stat: type check + size routing + the version recorded as observed.
       // A concurrent write can only make a later guarded mutation fail stale and require reread.
       const info = await ctx.fs.stat(target, exec.signal)
-      if (!info) throw new FsError(`cannot read "${target.displayPath}": not found`, 'FS_NOT_FOUND')
-      if (info.type !== 'file') throw new FsError(`cannot read "${target.displayPath}": not a regular file`, 'FS_NOT_REGULAR_FILE')
+      // A failed read invalidates any prior observation of this target: the recorded
+      // version can no longer guard a mutation, and keeping it would make the next
+      // write loop on replaceIfVersion(stale) instead of deciding createIfAbsent.
+      if (!info) {
+        ctx.emit('fs/observed-clear', target, exec)
+        throw new FsError(`cannot read "${target.displayPath}": not found`, 'FS_NOT_FOUND')
+      }
+      if (info.type !== 'file') {
+        ctx.emit('fs/observed-clear', target, exec)
+        throw new FsError(`cannot read "${target.displayPath}": not a regular file`, 'FS_NOT_REGULAR_FILE')
+      }
 
       // Stream when the file is large OR size is unknown, so a size-less backend
       // never buffers an arbitrarily large file.

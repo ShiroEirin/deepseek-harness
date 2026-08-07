@@ -69,6 +69,17 @@ declare module 'cordis' {
      * @mode emit
      */
     'fs/observed'(target: FsTarget, version: FsVersion, actor: object | undefined): void
+    /**
+     * Invalidate a prior observation because the target is no longer readable
+     * (e.g. FS_NOT_FOUND after an external delete). The recorded version can no
+     * longer guard a mutation; dropping it lets the next write decide
+     * createIfAbsent instead of looping on replaceIfVersion(stale) forever.
+     * Listeners must be synchronous, side-effect-only recorders.
+     * @param target - the target whose observation should be dropped.
+     * @param actor - the tool-execution context that owns the observation.
+     * @mode emit
+     */
+    'fs/observed-clear'(target: FsTarget, actor: object | undefined): void
   }
 }
 
