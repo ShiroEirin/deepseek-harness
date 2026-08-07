@@ -278,3 +278,50 @@ export class TokenMeterService extends Service {
           }
         }
       }
+    }
+
+    state.header = nextHeader
+    state.stepStart = nextStepStart
+    if (surface !== undefined) {
+      state.surface = surface.nodes
+      state.surfaceTokens += surface.deltaTokens
+    }
+    state.anchor = nextAnchor
+  }
+
+  /**
+   * Reassemble provider output from exact chunk provenance for a usage anchor.
+   * Missing legacy provenance conservatively treats the durable output as the
+   * provider output; explicit empty provenance prices a known empty stream.
+   * Torn provenance (upstream issue #88) returns null so the caller falls back
+   * to the durable heuristic price and records the first degradation.
+   */
+  private _estimateProviderAssistant(
+    session: Session,
+    event: SessionEvent<'assistant/message'>,
+    durableEventTokens: number,
+  ): number | null {
+    const sourceSeqs = event.sourceEventSeqs
+    if (sourceSeqs === undefined) return durableEventTokens
+
+    const assembler = new BlockAssembler()
+    const seen = new Set<number>()
+    for (const seq of sourceSeqs) {
+      if (seq >= event.seq) return null
+      if (seen.has(seq)) return null
+      seen.add(seq)
+      // Session construction validates contiguous seqs, and the explicit
+      // earlier-than-assistant check above therefore guarantees existence.
+      const source = session.events[seq]
+      // oxlint-disable-next-line typescript/no-non-null-assertion
+      const sourceEvent = source!
+      if (sourceEvent.type !== 'assistant/chunk') return null
+      if (sourceEvent.data.turn !== event.data.turn || sourceEvent.data.step !== event.data.step) return null
+      assembler.push(sourceEvent.data.chunk)
+    }
+    const providerContent = assembler.blocks()
+    return providerContent.length === 0 ? 0 : estimateContent(providerContent) + ROLE_OVERHEAD
+  }
+}
+
+export default TokenMeterService
