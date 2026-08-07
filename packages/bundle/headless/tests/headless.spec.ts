@@ -35,6 +35,10 @@ function scriptedApi(events: ScriptedEvent[], options: { promptFails?: boolean }
     events: {
       mux: async function* () {
         for (const event of events) {
+          if (event.type === 'delay') {
+            await new Promise(resolve => setTimeout(resolve, event.data.ms as number))
+            continue
+          }
           if (event.type === 'stream/error') {
             yield { rpcId: 'e', payload: { type: 'stream/error', error: { code: 'cancelled', message: 'stream broke', details: {} } } }
             continue
@@ -122,6 +126,20 @@ describe('headless runner', () => {
     // The consumer stopped at the stream error; the completed turn-end after
     // it is never observed, so the reason stays 'error'.
     expect(code).toBe(1)
+  })
+
+  it('does not report failure when the idle status lands before the final result frame (out-of-band idle races the turn-end)', async () => {
+    // #376: the idle status transition is emitted out of band and can precede
+    // the frames that carry the outcome. The run must wait for the turn-end
+    // too; returning at idle alone would exit 1 with no output on a success.
+    const { code, out } = await run([
+      messageTurn,
+      text(1, 'slow answer'),
+      { type: 'delay', data: { ms: 30 } }, // keep the result frame in flight past the idle emit
+      end(1, 'completed'),
+    ])
+    expect(code).toBe(0)
+    expect(out).toBe('slow answer\n')
   })
 
   it('prints an RPC business error and exits 1 without waiting for idle', async () => {

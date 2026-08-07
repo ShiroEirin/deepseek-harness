@@ -99,11 +99,24 @@ async function consumeUntilIdle(
   let started = false
   let text = ''
   let reason: string = 'error'
+  // The idle status transition is emitted out of band and can land before the
+  // final result frames drain (the notification races ahead of the data it
+  // reports). Wait for both quiescence and the frames that fix the outcome;
+  // returning at idle alone would leave the default 'error' reason and exit 1
+  // on a run that actually completed.
+  let settle: () => void = () => {}
+  let settledOnce = false
+  const settled = new Promise<void>((resolve) => { settle = resolve })
+  const markSettled = (): void => { if (!settledOnce) { settledOnce = true; settle() } }
   void (async () => {
     try {
       for await (const frame of frames) {
         const payload = frame.payload
-        if (payload.type === 'stream/error') return
+        if (payload.type === 'stream/error') {
+          // The consumer stops here; the frames after it never arrive.
+          markSettled()
+          return
+        }
         if (payload.type !== 'session/event' || payload.sessionId !== sessionId) continue
         const event = payload.event
         if (event.type === 'turn/start') {
@@ -115,13 +128,20 @@ async function consumeUntilIdle(
           const joined = event.data.message.content.filter(block => block.type === 'text').map(block => block.text).join('')
           if (joined !== '') text = joined
         }
-        if (event.type === 'turn/end') reason = event.data.reason.kind
+        if (event.type === 'turn/end') {
+          reason = event.data.reason.kind
+          markSettled()
+        }
       }
+      // The stream drained normally: nothing more can fix the outcome.
+      markSettled()
     } catch (error: unknown) {
       io.stderr.write(`dsh: event stream failed: ${String(error)}\n`)
+      markSettled()
     }
   })()
   await idle
+  await settled
   return { text, reason }
 }
 
