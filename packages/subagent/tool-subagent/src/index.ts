@@ -122,7 +122,9 @@ function stopReasonError(result: SubagentResult): string | undefined {
     case 'aborted':
       return 'subagent run was cancelled'
     case 'error':
-      return 'subagent run failed'
+      return result.error === undefined
+        ? 'subagent run failed'
+        : `subagent run failed: ${result.error}`
     case 'max-tokens':
       return 'subagent run hit its token limit before finishing'
     case 'refusal':

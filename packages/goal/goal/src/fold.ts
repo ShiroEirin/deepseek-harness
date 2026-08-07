@@ -171,13 +171,21 @@ export function decodeGoalChange(value: unknown): GoalChangeMeta | undefined {
   } satisfies GoalSnapshotChangeMeta
 }
 
-/** Narrow model attribution to a valid goal source. */
+/**
+ * Narrow model attribution to a valid goal source.
+ *
+ * A `kind === 'goal'` source whose identity fields are malformed (a torn
+ * in-memory event, e.g. after an interrupted append) is skipped rather than
+ * thrown: the goal service must stay usable for every other event in the
+ * fold. Semantic mismatches (wrong round/revision against the active goal)
+ * remain fail-loud in `applyGoalEvent`.
+ */
 function goalSource(source: MessageSource): GoalMessageSource | undefined {
   if (source.kind !== 'goal') return undefined
   if (typeof source.goalId !== 'string' || source.goalId.length === 0
     || !Number.isSafeInteger(source.revision) || source.revision < 1
     || !Number.isSafeInteger(source.round) || source.round < 1) {
-    throw new Error('goal message source is invalid')
+    return undefined
   }
   return source
 }

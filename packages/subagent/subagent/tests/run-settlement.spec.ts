@@ -62,4 +62,17 @@ describe('outcome mapping helpers', () => {
       detail: 'Error: result failed; dispose failed: Error: reap failed',
     })
   })
+
+  it('carries the child error detail on an error stop reason', async () => {
+    await expect(settleRun({
+      id: SessionId('child-error'),
+      localAgent: undefined,
+      result: Promise.resolve({
+        output: [{ type: 'text' as const, text: 'partial' }],
+        stopReason: 'error' as const,
+        error: 'codex failed: approval rejected',
+      }),
+      dispose: () => Promise.resolve(),
+    })).resolves.toEqual({ status: 'failed', detail: 'codex failed: approval rejected' })
+  })
 })

@@ -33,6 +33,8 @@ export interface Config {
   inheritsParentContext?: boolean
   /** Structured value returned when the request asks for one. */
   structured?: unknown
+  /** Diagnostic detail returned with a non-completed result. */
+  error?: string
 }
 
 /** Scripted provider whose result aborts if its signal or disposer wins first. */
@@ -66,6 +68,7 @@ class ScriptedSubagentProvider implements SubagentProvider {
     const resultFor = (): SubagentResult => ({
       output,
       ...wantsStructured ? { structured: this.config.structured ?? { reply } } : {},
+      ...this.config.error !== undefined ? { error: this.config.error } : {},
       stopReason: state.cancelled ? 'aborted' : stopReason,
     })
     const result = new Promise<SubagentResult>((resolve) => {

@@ -156,6 +156,20 @@ describe('dsh-tool-subagent', () => {
     expect(text(result)).toContain(fragment)
   })
 
+  it('surfaces execution error detail from the child result instead of a fixed message', async () => {
+    const ctx = await setup(
+      { provider: 'mock' },
+      {
+        stopReason: 'error',
+        error: 'Codex turn ended with status failed: {"message":"approval request aborted"}',
+      },
+    )
+    const result = await callSubagent(ctx, { description: 'd', prompt: 'p' })
+    expect(result.isError).toBe(true)
+    expect(text(result)).toContain('subagent run failed')
+    expect(text(result)).toContain('approval request aborted')
+  })
+
   it('registers under a configurable toolName so multiple providers can coexist', async () => {
     // The defining multi-provider use case: two loads, two distinct tool names,
     // each bound to a different provider — the tool registry rejects duplicate

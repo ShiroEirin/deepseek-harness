@@ -224,6 +224,14 @@ export interface SubagentResult {
   readonly structured?: unknown
   /** Why the run ended. A non-`completed` reason means `output` may be partial. */
   readonly stopReason: SubagentStopReason
+  /**
+   * Diagnostic detail for a non-`completed` terminal state. Transport and
+   * model failures flattened to `stopReason: 'error'` carry their original
+   * error message here so consumers can distinguish environment faults,
+   * rejected approvals, and crashes instead of reporting a fixed string.
+   * Absent when the run ended without an underlying error to report.
+   */
+  readonly error?: string
 }
 
 /**
