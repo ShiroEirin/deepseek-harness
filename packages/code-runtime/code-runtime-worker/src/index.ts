@@ -65,6 +65,15 @@ const ELU_POLL_INTERVAL_MS = 25
 /** Smallest cap that can represent the counted payloads: an empty logs array plus an empty JSON failure message. */
 const MIN_OUTPUT_BYTES = 4
 
+/**
+ * Smallest worker heap that lets V8 boot. Values below ~8 MiB make the worker's
+ * startup deserialization itself fatal (V8 Fatal OOM, uncatchable, no error
+ * event, no worker-exit result) or deterministically kill the worker before
+ * the first run; reject them at load time instead of forwarding to
+ * `resourceLimits`.
+ */
+const MIN_OLD_GEN_MB = 8
+
 /** ECMAScript reserved words that cannot be async-function parameter names — rejected as binding globals. */
 const RESERVED_WORDS = new Set([
   'await', 'break', 'case', 'catch', 'class', 'const', 'continue', 'debugger', 'default', 'delete', 'do',
@@ -268,6 +277,9 @@ export class WorkerCodeRuntime extends CodeRuntime {
     }
     if (!Number.isSafeInteger(this.config.maxOutputBytes) || this.config.maxOutputBytes < MIN_OUTPUT_BYTES) {
       throw new Error(`dsh-code-runtime-worker: config.maxOutputBytes must be a safe integer of at least ${MIN_OUTPUT_BYTES}, got ${String(this.config.maxOutputBytes)}`)
+    }
+    if (!Number.isSafeInteger(this.config.maxOldGenerationSizeMb) || this.config.maxOldGenerationSizeMb < MIN_OLD_GEN_MB) {
+      throw new Error(`dsh-code-runtime-worker: config.maxOldGenerationSizeMb must be a safe integer of at least ${MIN_OLD_GEN_MB} MiB (below that the worker heap cannot boot and V8 Fatal OOM crashes the host), got ${String(this.config.maxOldGenerationSizeMb)}`)
     }
     // maxWallMs reaches setTimeout, which clamps any delay above
     // MAX_TIMER_DELAY_MS to 1 ms; the positivity check above accepts such a

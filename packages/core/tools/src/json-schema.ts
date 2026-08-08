@@ -450,9 +450,21 @@ function losslessValueViolation(path: string): string[] {
   return [`"${diagnosticPath(path)}" must be a lossless JSON value`]
 }
 
+/** Cap on aggregated violation diagnostics, mirroring the tool-output family's bounded/truncated diagnostics. */
+const MAX_VIOLATIONS = 64
+
+/** Marker appended once when the violation cap is hit. */
+const VIOLATIONS_TRUNCATED = '… and more violations (truncated)'
+
 /** Append diagnostics without spreading a potentially wide child result as call arguments. */
 function appendViolations(target: string[], source: readonly string[]): void {
-  for (const violation of source) target.push(violation)
+  for (const violation of source) {
+    if (target.length >= MAX_VIOLATIONS) {
+      if (target[target.length - 1] !== VIOLATIONS_TRUNCATED) target.push(VIOLATIONS_TRUNCATED)
+      return
+    }
+    target.push(violation)
+  }
 }
 
 /** Initialize one validation frame with empty aggregation state. */

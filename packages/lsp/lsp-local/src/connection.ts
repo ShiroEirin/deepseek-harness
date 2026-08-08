@@ -130,6 +130,12 @@ export class LspConnection {
     // waiting for a process-close event that may never arrive.
     this.stdin.on('error', (error) => { this.fail(error) })
     this.handle.stdout.on('data', (chunk: Buffer) => { this.onStdout(chunk) })
+    // Child stdout can fail the same way stdin can (a pipe break, an EIO on the
+    // protocol stream). Without a listener Node surfaces the error as an
+    // uncaughtException that crashes the whole harness instead of the designed
+    // fatal-transport path (fail -> failAll -> connection close); keep the two
+    // protocol streams symmetric.
+    this.handle.stdout.on('error', (error) => { this.fail(error) })
   }
 
   /** The child's pid, or `-1` when the spawn produced no pid (so signalling is a no-op). */
