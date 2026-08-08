@@ -335,13 +335,20 @@ export class SessionLogScanner {
     try {
       decoded = decodeStorageRecord(JSON.parse(line.toString('utf8')))
     } catch {
+      // A line that cannot be parsed is tolerable only as the final torn
+      // fragment of a crash tail. If any later line parses, the corruption
+      // sits mid-log rather than at the end, so the whole log must be
+      // rejected: silently dropping the events after the bad line would
+      // truncate committed data away (upstream issue #474).
       this.issue ??= new Error(`corrupt session log: unparsable committed event at line ${this.eventLine}`)
       return
     }
 
     if (this.issue !== undefined) {
-      if (decoded.some(event => event.type === 'turn/end')) throw this.issue
-      return
+      // A fully parsed event after a corrupt line proves the corruption is
+      // inside committed data, not a crash tail: reject instead of waiting
+      // for a turn/end that may never come.
+      throw this.issue
     }
 
     const rowStart = this.events.length

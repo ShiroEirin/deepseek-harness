@@ -716,16 +716,27 @@ describe('SessionPersistenceJsonl: scanLog unit', () => {
     expect(() => { scanner.write(Buffer.from('\n')) }).toThrow(/finished/)
   })
 
-  it('keeps scanning after a tolerable corrupt suffix until a committed turn end appears', () => {
+  it('rejects a corrupt line followed by any parsed event (committed data damaged, issue #474)', () => {
     const header = Buffer.from(`${JSON.stringify(toHeaderLine(meta('scanner-corrupt-suffix')))}\n`)
+    // A corrupt line followed by a fully parsed event proves the corruption
+    // sits mid-log, not in a crash tail: the whole log must be rejected so
+    // the events after the bad line are never silently truncated away.
     const scanner = new SessionLogScanner(header)
-    scanner.write(Buffer.from([
+    expect(() => { scanner.write(Buffer.from([
       JSON.stringify(oneTurnLog()[0]),
       '{not json',
       JSON.stringify({ type: 'step/start', seq: 1, time: 2, data: { turn: 1, step: 1 } }),
       '',
+    ].join('\n'))) }).toThrow(/unparsable committed event at line 2/)
+
+    // A corrupt line as the final complete line is still a tolerable crash
+    // tail: the contiguous prefix is preserved for interrupted-turn repair.
+    const tail = new SessionLogScanner(header)
+    tail.write(Buffer.from([
+      JSON.stringify(oneTurnLog()[0]),
+      '{not json',
     ].join('\n')))
-    expect(scanner.finish().events).toEqual([oneTurnLog()[0]])
+    expect(tail.finish().events).toEqual([oneTurnLog()[0]])
 
     const committed = new SessionLogScanner(header)
     expect(() => { committed.write(Buffer.from([

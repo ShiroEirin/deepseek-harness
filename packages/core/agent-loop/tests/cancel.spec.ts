@@ -228,7 +228,7 @@ describe('Agent.cancel()', () => {
     expect(userTexts(agent)).toEqual(['first', 'later'])
   })
 
-  it('replacement work queued after idle-listener cancellation waits for another wakeup', async () => {
+  it('processes replacement work queued after idle-listener cancellation', async () => {
     const adapter = new MockAdapter([
       textResponse('first reply'),
       textResponse('replacement reply'),
@@ -253,9 +253,11 @@ describe('Agent.cancel()', () => {
     if (replacementIdle === undefined) throw new Error('idle listener did not register replacement work')
     await replacementIdle
 
-    expect(adapter.requests).toHaveLength(1)
-    expect(userTexts(agent)).toEqual(['first'])
-    expect(agent.inbox.nextTurn).toHaveLength(1)
+    // The replacement that landed during the cancelled drain starts the next
+    // turn instead of stranding in the inbox (upstream issue #472).
+    expect(adapter.requests).toHaveLength(2)
+    expect(userTexts(agent)).toEqual(['first', 'surviving replacement'])
+    expect(agent.inbox.nextTurn).toHaveLength(0)
 
     const idle = waitForIdle(ctx, agent)
     send(agent, 'wake it')
@@ -479,7 +481,7 @@ describe('Agent.cancel()', () => {
     expect(agent.session.events.some(e => e.type === 'turn/start')).toBe(false)
   })
 
-  it('a running-listener cancellation parks replacement work until another wakeup', async () => {
+  it('a running-listener cancellation processes replacement work', async () => {
     const adapter = new MockAdapter([textResponse('A reply'), textResponse('B reply')])
     const ctx = await harness(adapter)
     const agent = ctx.agentLoop.create(SessionId('a1'), { provider: 'mock', model: 'mock' })
@@ -497,8 +499,8 @@ describe('Agent.cancel()', () => {
     await idle
     dispose()
 
-    expect(userTexts(agent)).toEqual([])
-    expect(agent.inbox.nextTurn).toHaveLength(1)
+    expect(userTexts(agent)).toEqual(['B'])
+    expect(agent.inbox.nextTurn).toHaveLength(0)
 
     const replacementIdle = waitForIdle(ctx, agent)
     send(agent, 'C')
@@ -507,7 +509,7 @@ describe('Agent.cancel()', () => {
     expect(agent.session.events.filter(event => event.type === 'turn/end')).toHaveLength(2)
   })
 
-  it('a prompt queued during pre-step cancellation waits for another wakeup', async () => {
+  it('processes a prompt queued during pre-step cancellation', async () => {
     const adapter = new MockAdapter([textResponse('A reply'), textResponse('B reply')])
     const ctx = await harness(adapter)
     const agent = ctx.agentLoop.create(SessionId('a1'), { provider: 'mock', model: 'mock' })
@@ -518,8 +520,8 @@ describe('Agent.cancel()', () => {
     send(agent, 'B')
 
     await idle
-    expect(userTexts(agent)).toEqual([])
-    expect(agent.inbox.nextTurn).toHaveLength(1)
+    expect(userTexts(agent)).toEqual(['B'])
+    expect(agent.inbox.nextTurn).toHaveLength(0)
 
     const replacementIdle = waitForIdle(ctx, agent)
     send(agent, 'C')
@@ -556,7 +558,7 @@ describe('Agent.cancel()', () => {
     expect(flat).not.toContain('steer text')
   })
 
-  it('parks replacement work queued synchronously by an abort observer', async () => {
+  it('processes replacement work queued synchronously by an abort observer', async () => {
     const adapter = new MockAdapter([
       'hang',
       textResponse('replacement reply'),
@@ -586,13 +588,16 @@ describe('Agent.cancel()', () => {
       }),
     ])
 
-    expect(adapter.requests).toHaveLength(1)
-    expect(userTexts(agent)).toEqual(['original'])
-    expect(agent.inbox.nextTurn).toHaveLength(1)
+    expect(adapter.requests).toHaveLength(2)
+    expect(userTexts(agent)).toEqual(['original', 'replacement'])
+    expect(agent.inbox.nextTurn).toHaveLength(0)
     const reasons = agent.session.events
       .filter(event => event.type === 'turn/end')
       .map(event => event.type === 'turn/end' ? event.data.reason : undefined)
-    expect(reasons).toEqual([{ kind: 'aborted', reason: { kind: 'user' } }])
+    expect(reasons).toEqual([
+      { kind: 'aborted', reason: { kind: 'user' } },
+      { kind: 'completed' },
+    ])
 
     const replacementIdle = waitForIdle(ctx, agent)
     send(agent, 'wake it')

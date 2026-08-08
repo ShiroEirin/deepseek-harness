@@ -65,6 +65,8 @@ export class ReactLoopAgent implements Agent {
   readonly inbox: Inbox
   private phase: Phase
   private activityDone: Promise<void> = Promise.resolve()
+  /** A wakeup that arrived while a driver was running; it restarts the driver once it drains. */
+  private wakePending = false
 
   /** The agent-scoped registration boundary; the lifecycle owner unwinds it after the driver exits. */
   readonly scope: Scope
@@ -166,7 +168,14 @@ export class ReactLoopAgent implements Agent {
       if (!this.phase.abort.signal.aborted) this.phase.wakeRequested = true
       return
     }
-    if (this.phase.kind !== 'idle') return
+    if (this.phase.kind !== 'idle') {
+      // A wakeup that lands after the abort signal was raised cannot wake the
+      // running driver; remember it so the driver restarts once it drains and
+      // the message does not strand in the inbox (upstream issue #472).
+      if (this.phase.abort.signal.aborted) this.wakePending = true
+      return
+    }
+    this.wakePending = false
     const driver = Promise.withResolvers<void>()
     this.activityDone = driver.promise
     this.setPhase({ kind: 'running', abort: new AbortController(), turn: this.phase.lastTurn, step: 0 })
@@ -197,6 +206,16 @@ export class ReactLoopAgent implements Agent {
       /* v8 ignore next -- kick owns a running phase until this driver boundary */
       if (this.phase.kind === 'running') {
         this.setPhase({ kind: 'idle', lastTurn: this.phase.turn })
+        // A wakeup that landed during the aborted/error drain window cannot
+        // wake the driver while it was still running; restart it now so the
+        // message does not strand in the inbox until an unrelated message
+        // arrives (upstream issue #472). Restoring claimed input on assembly
+        // failure does NOT set wakePending, so a failing pre-step still lets
+        // the driver stop instead of hot-looping.
+        if (this.wakePending) {
+          this.wakePending = false
+          if (this.inbox.hasPending) this.wakeDriver()
+        }
       }
     }
   }
@@ -205,9 +224,20 @@ export class ReactLoopAgent implements Agent {
     /* v8 ignore next -- private callers establish the running phase before proposing a step */
     if (this.phase.kind !== 'running') throw new Error(`agent "${this.id}": pre-step outside running phase`)
     const signal = this.phase.abort.signal
-    const claimed = this.inbox.claim(target, position.turn)
-    const assembly = await this.loopCtx.systemPrompt.assemble(assembleContextFor(this, signal))
     signal.throwIfAborted()
+    const claimed = this.inbox.claim(target, position.turn)
+    let assembly: PromptAssembly
+    try {
+      assembly = await this.loopCtx.systemPrompt.assemble(assembleContextFor(this, signal))
+      signal.throwIfAborted()
+    } catch (error) {
+      // System-prompt assembly failure must not silently destroy claimed
+      // input: restore it to the head of its target so a retry or the next
+      // turn can pick it up again (upstream issue #473). An abort (cancel)
+      // deliberately drops already-claimed work, so it must not restore.
+      if (!signal.aborted) this.inbox.splice(target, 0, 0, claimed)
+      throw error
+    }
     const sections = renderContextSections(assembly)
     const context = this.runtimeContext.project(joinContextSections(sections), sections)
     const decision = await this.dispatch.waterfall(
@@ -324,6 +354,13 @@ export class ReactLoopAgent implements Agent {
       for await (const chunk of stream) {
         signal.throwIfAborted()
         chunkSeqs.push(this.session.append('assistant/chunk', { turn, step, chunk }).seq)
+        if (chunk.type === 'finish') {
+          // A finish chunk is terminal: stop consuming here so protocol
+          // garbage after it can neither enter the assembled message nor
+          // overwrite the terminal finish reason (upstream issue #438).
+          assembler.push(chunk)
+          break
+        }
         assembler.push(chunk)
       }
       signal.throwIfAborted()

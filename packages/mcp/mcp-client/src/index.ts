@@ -152,31 +152,88 @@ export function apply(ctx: Context, config: Config): void {
   const ready = (async () => {
     await client.connect(transport)
 
-    let disposers = await syncTools(client, ctx, opts, new Map())
+    let disposers = new Map<string, () => void>()
 
+    // Serialise re-syncs (issue #444): overlapping ToolListChanged
+    // notifications must not drive concurrent syncTools calls — each one
+    // would swap the registry out from under the other. Concurrent
+    // notifications are coalesced into at most one follow-up re-sync.
+    let syncInFlight = false
+    let resyncPending = false
+    const hasPendingResync = () => resyncPending
+    const resync = async () => {
+      if (syncInFlight) {
+        resyncPending = true
+        return
+      }
+      syncInFlight = true
+      try {
+        do {
+          resyncPending = false
+          try {
+            disposers = await syncTools(client, ctx, opts, disposers)
+          } catch (error) {
+            // Fetch-phase failure: the previous generation is still
+            // registered and `disposers` still owns it — keep serving the
+            // last good list.
+            ctx.logger.error(
+              `mcp-client(${config.serverName}): tool re-sync failed: ${String(
+                error,
+              )}`,
+            )
+          }
+        } while (hasPendingResync())
+      } finally {
+        syncInFlight = false
+      }
+    }
+
+    // Register the change handler BEFORE the first sync (issue #445): the
+    // initial sync phase is exactly when a warming-up server is most likely
+    // to emit list_changed, and the old code silently dropped it because the
+    // handler was only installed afterwards.
     client.setNotificationHandler(
       ToolListChangedNotificationSchema,
       async () => {
-        ctx.logger.info(`mcp-client(${config.serverName}): tool list changed, re-syncing`)
-        try {
-          disposers = await syncTools(client, ctx, opts, disposers)
-        } catch (error) {
-          // Fetch-phase failure: the previous generation is still registered
-          // and `disposers` still owns it — keep serving the last good list.
-          ctx.logger.error(`mcp-client(${config.serverName}): tool re-sync failed: ${String(error)}`)
-        }
+        ctx.logger.info(
+          `mcp-client(${config.serverName}): tool list changed, re-syncing`,
+        )
+        await resync()
       },
     )
 
+    try {
+      disposers = await syncTools(client, ctx, opts, new Map())
+    } catch (error) {
+      // Initial sync failure is logged, not thrown: the plugin simply starts
+      // with no tools registered. The change handler above stays active, so
+      // the next ToolListChanged notification retries the sync — a transient
+      // startup failure is recoverable instead of leaving the plugin deaf.
+      ctx.logger.error(
+        `mcp-client(${config.serverName}): initial tool sync failed: ${String(
+          error,
+        )}`,
+      )
+    }
+
     return () => disposers
   })().catch((error: unknown) => {
-    ctx.logger.error(`mcp-client(${config.serverName}): failed to connect: ${String(error)}`)
+    ctx.logger.error(
+      `mcp-client(${config.serverName}): failed to connect: ${String(error)}`,
+    )
     return () => new Map<string, () => void>()
   })
 
-  ctx.effect(() => async () => {
-    const live = await ready
-    for (const dispose of live().values()) dispose()
-    try { await client.close() } catch { /* transport already gone */ }
-  }, 'mcp-client.connection')
+  ctx.effect(
+    () => async () => {
+      const live = await ready
+      for (const dispose of live().values()) dispose()
+      try {
+        await client.close()
+      } catch {
+        /* transport already gone */
+      }
+    },
+    'mcp-client.connection',
+  )
 }
