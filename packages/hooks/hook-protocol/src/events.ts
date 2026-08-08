@@ -35,6 +35,13 @@ export interface HookResultRecord {
    */
   output: HookOutput
   /**
+   * Whether the hook process completed normally. Omitted/true means a normal
+   * completion (the historical behavior); false (killed by timeout/signal or
+   * never ran) records the run as `timeout` instead of a clean `pass`
+   * (upstream #442).
+   */
+  completed?: boolean
+  /**
    * Character cap for the derived `stderrSummary`. The bound is the bridge's
    * to own (its `stderrSummaryMaxChars` config) and is passed in explicitly —
    * {@link DEFAULT_STDERR_SUMMARY_MAX_CHARS} is the reference default.
@@ -96,7 +103,7 @@ export function appendHookResult(session: Session, record: HookResultRecord): vo
     turn: record.turn,
     point: record.point,
     handlerId: record.handlerId,
-    decision: output.decision ?? (output.continue === false ? 'stop' : 'pass'),
+    decision: output.decision ?? (output.continue === false ? 'stop' : record.completed === false ? 'timeout' : 'pass'),
     ...output.exitCode !== undefined ? { exitCode: output.exitCode } : {},
     ...stderrSummary !== undefined ? { stderrSummary } : {},
     durationMs: record.durationMs,

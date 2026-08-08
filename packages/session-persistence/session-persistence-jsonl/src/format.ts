@@ -241,6 +241,14 @@ function parseHeaderRecord(record: Buffer): SessionHeader {
 }
 
 /**
+ * Hard cap on events expanded from one session log during scanning. A forged
+ * storage row can otherwise fan out arbitrarily many events from a tiny file
+ * (a ~2KB zstd bomb expanding to millions of events freezes the process and
+ * grows RSS into GBs, upstream #471); reject the session instead.
+ */
+const MAX_SCANNED_EVENTS = 500_000
+
+/**
  * Incrementally scan complete JSONL event records after an independently
  * supplied header record. Newline search and byte offsets stay on raw buffers;
  * only complete records are decoded to UTF-8. A fragment crossing writes is
@@ -347,6 +355,11 @@ export class SessionLogScanner {
         )
         if (decoded.some(candidate => candidate.type === 'turn/end')) throw this.issue
         return
+      }
+      if (this.events.length >= MAX_SCANNED_EVENTS) {
+        throw new Error(
+          `corrupt session log: event count exceeds ${MAX_SCANNED_EVENTS} at line ${this.eventLine} (possible compression bomb)`,
+        )
       }
       this.events.push(event)
     }

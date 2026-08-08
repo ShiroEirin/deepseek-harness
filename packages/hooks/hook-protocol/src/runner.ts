@@ -51,6 +51,13 @@ export interface RunHookResult {
   output: HookOutput
   /** Wall-clock duration of the run, from `now` — durable on the `hook/result` event. */
   durationMs: number
+  /**
+   * Whether the hook process completed normally. False when it was killed by
+   * timeout or signal (BashRunResult.timedOut/aborted) or never ran (infra
+   * fault); the audit record must not report such a run as a clean 'pass'
+   * (upstream #442).
+   */
+  completed: boolean
 }
 
 /**
@@ -92,6 +99,7 @@ export async function runHook(
     return {
       output: parseHookOutput(exitCode, result.stdout.text, result.stderr.text, options.expectedEventName),
       durationMs: now() - started,
+      completed: !result.timedOut && !result.aborted,
     }
   } catch (error: unknown) {
     // The executor rejects only on infrastructure faults (unusable workdir,
@@ -101,6 +109,7 @@ export async function runHook(
     return {
       output: parseHookOutput(undefined, '', message),
       durationMs: now() - started,
+      completed: false,
     }
   }
 }

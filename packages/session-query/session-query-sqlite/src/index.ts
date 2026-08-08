@@ -483,10 +483,20 @@ export class SessionQuerySqlite extends SessionQueryService {
             // the returned observation live-preferred.
             if (initiallyLive.has(entry.header.id) || this.ctx.sessions.get(entry.header.id) !== undefined) continue
             assertNotAborted(signal)
-            const loaded = await persistence.inspect(entry.header.id, signal)
-            assertNotAborted(signal)
-            assertSessionHeadersCompatible(entry.header, loaded.meta)
-            entry.loaded = observeSession(loaded.meta, loaded.events)
+            // A corrupted/forged session log must not take down the whole
+            // search index: skip the offending session (recorded with its id)
+            // and keep indexing the rest (upstream #448). Only aborts rethrow.
+            try {
+              const loaded = await persistence.inspect(entry.header.id, signal)
+              assertNotAborted(signal)
+              assertSessionHeadersCompatible(entry.header, loaded.meta)
+              entry.loaded = observeSession(loaded.meta, loaded.events)
+            } catch (error: unknown) {
+              if (isAbort(error) || signal?.aborted) throw error
+              console.warn(
+                `dsh-session-query-sqlite: skipping corrupted session "${entry.header.id}" during reconcile: ${errorMessage(error)}`,
+              )
+            }
           }
           assertNotAborted(signal)
           const afterSnapshots = await persistence.listSnapshots(signal)
