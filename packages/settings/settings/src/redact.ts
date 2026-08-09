@@ -20,6 +20,8 @@ interface SchemaNode {
   dict?: Record<string, SchemaNode>
   /** `dict`/`array` element schema. */
   inner?: SchemaNode
+  /** `union` member schemas. */
+  list?: SchemaNode[]
 }
 
 /** One schema-declared secret position inside a redacted value. */
@@ -82,6 +84,21 @@ const SAFE_LEAF_TYPES = new Set([
   'literal',
 ])
 
+/**
+ * Whether a secret-role field is reachable anywhere through this schema node.
+ * Used to decide whether an unwalkable node (union) can hide a secret: a node
+ * whose whole subtree declares no secret is a plain value carrier and passes
+ * through; one that does is fail-closed (upstream #410).
+ */
+function declaresSecret(node: SchemaNode | undefined): boolean {
+  if (!node) return false
+  if (node.meta?.role === 'secret') return true
+  if (node.dict && Object.values(node.dict).some(declaresSecret)) return true
+  if (node.inner && declaresSecret(node.inner)) return true
+  if (node.list && node.list.some(declaresSecret)) return true
+  return false
+}
+
 function walk(
   node: SchemaNode | undefined,
   value: unknown,
@@ -123,6 +140,19 @@ function walk(
     case 'array': {
       if (!Array.isArray(value)) return value
       return value.map((entry, index) => walk(node.inner, entry, [...path, String(index)], secrets, unreachable))
+    }
+    case 'union': {
+      // A union whose members declare no secret anywhere is a plain value
+      // carrier (preset / effort / retry selectors): pass it through
+      // untouched. Only when a secret role is reachable through a member is
+      // the node unwalkable in the fail-closed sense (upstream #410).
+      if (!declaresSecret(node)) return value
+      unreachable.push({ path, type: node.type })
+      console.warn(
+        `[dsh-settings] redact: cannot structurally walk schema node "${node.type ?? 'unknown'}" at "${path.join('.')}" — ` +
+          'a secret declared behind this node is NOT redacted; refuse to ship this value to the wire',
+      )
+      return value
     }
     default:
       // Leaf scalar types carry no structure a secret could hide behind; pass

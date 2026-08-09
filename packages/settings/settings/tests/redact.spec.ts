@@ -135,6 +135,22 @@ describe('redactSecrets', () => {
       warn.mockRestore()
     }
   })
+
+  it('passes a union whose members declare no secret (preset/effort/retry selectors)', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      const Plain = z.object({
+        retryPolicy: z.union([z.object({ maxRetries: z.number() }), z.string()]),
+      })
+      const { value, secrets, unreachable } = redactSecrets(Plain as z<never>, { retryPolicy: { maxRetries: 3 } })
+      expect(value).toEqual({ retryPolicy: { maxRetries: 3 } })
+      expect(secrets).toEqual([])
+      expect(unreachable).toEqual([])
+      expect(warn).not.toHaveBeenCalled()
+    } finally {
+      warn.mockRestore()
+    }
+  })
 })
 
 describe('describe() layers and redaction', () => {
