@@ -268,7 +268,7 @@ export class PlanModeService extends Service {
         input: { hint: '[off|message]' },
         handler: ({ agent, rawInput }) => {
           const message = rawInput.trim()
-          if (message === 'off') {
+          if (isPlanExitWord(message)) {
             switch (this.set(agent, false)) {
               case 'committed':
                 return { kind: 'success', text: 'Plan mode off.' }
@@ -464,6 +464,23 @@ export class PlanModeService extends Service {
       source: { kind: 'plugin', plugin: 'plan-mode', form: 'notice', summary: text },
     })
   }
+}
+
+/**
+ * True when a `/plan` argument reads as an exit intent rather than a message to
+ * enter plan mode with. Accepts the exact word plus common natural variants
+ * (off!, OFF, off now, "off, please") so a user trying to leave is never
+ * silently toggled back on (upstream #447).
+ */
+function isPlanExitWord(input: string): boolean {
+  const trimmed = input.trim()
+  if (trimmed === '') return false
+  const lower = trimmed.toLowerCase()
+  if (lower === 'off') return true
+  // Natural variants: off!, off., off, please, off now ... — anything that
+  // starts with "off" followed by punctuation or whitespace reads as leaving.
+  if (/^off[!.,\s]/.test(lower)) return true
+  return false
 }
 
 export default PlanModeService

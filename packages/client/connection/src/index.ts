@@ -57,6 +57,8 @@ export const Config: z<ConnectionConfig> = z.object({
 const PRIVILEGED_METHODS = new Set([
   'host.pickDirectory',
   'host.openPath',
+  'host.listDirectory',
+  'host.createDirectory',
   'settings.describe',
   'settings.openDocument',
   'settings.update',

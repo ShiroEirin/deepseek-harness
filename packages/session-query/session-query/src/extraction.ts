@@ -25,7 +25,7 @@ export function extractSessionEventText(event: SessionEvent): string {
         event.data.error?.code ?? '',
       ])
     case 'todo/write':
-      return joinText(event.data.todos.flatMap(todo => [todo.status, todo.content]))
+      return todoText(event.data.todos)
     case 'turn/end':
       return turnEndText(event.data.reason)
     case 'turn/start':
@@ -84,4 +84,27 @@ function blockText(block: SessionContentBlock): string[] {
 
 function joinText(parts: readonly string[]): string {
   return parts.map(part => part.trim()).filter(Boolean).join('\n')
+}
+
+/**
+ * Searchable text for one todo/write event's entries.
+ *
+ * Entries are trusted at the type level but not at runtime: a forged or
+ * malformed entry (non-record, missing status/content, non-string fields)
+ * contributes no text instead of throwing, so one bad event can neither crash
+ * extraction nor take down the whole search index (upstream #476).
+ */
+function todoText(todos: readonly unknown[]): string {
+  if (!Array.isArray(todos)) return ''
+  const parts: string[] = []
+  for (const todo of todos) {
+    if (!isRecord(todo)) continue
+    if (typeof todo.status === 'string') parts.push(todo.status)
+    if (typeof todo.content === 'string') parts.push(todo.content)
+  }
+  return joinText(parts)
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
