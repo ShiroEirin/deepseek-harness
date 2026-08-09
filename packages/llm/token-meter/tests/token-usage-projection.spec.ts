@@ -240,6 +240,29 @@ describe('tokenUsage session projection', () => {
       cacheWriteTokens: 0,
     })
   })
+
+  it('skips forged usage so the projection view never sees a bad number', async () => {
+    // A session log is writable storage (upstream #443): negative/string token
+    // fields must be skipped at the fold, not summed into the buckets, or the
+    // view's zod validation explodes on resume.
+    const { ctx, session } = await harness()
+    startStep(session, 1, 1)
+    usageChunk(session, { inputTokens: -5, outputTokens: 2 }, 1, 1)
+    usageChunk(
+      session,
+      { inputTokens: 10, outputTokens: 'oops' as never },
+      1,
+      1,
+    )
+    // A valid record afterwards still counts normally.
+    usageChunk(session, { inputTokens: 7, outputTokens: 3 }, 1, 1)
+    expect(projected(ctx, session)).toEqual({
+      uncachedInputTokens: 7,
+      outputTokens: 3,
+      cacheReadTokens: 0,
+      cacheWriteTokens: 0,
+    })
+  })
 })
 
 const pressure = (ctx: Context, session: Session): ContextPressureProjection => {
@@ -456,5 +479,23 @@ describe('contextPressure session projection', () => {
       sourceEventSeqs: [question],
     })
     expect(pressure(ctx, session).projectedTokens).toBe(0)
+  })
+
+  it('skips a forged contextWindow and keeps the last good capacity', async () => {
+    // Upstream #443: a forged (negative/string) contextWindow must not blow up
+    // the view's zod validation; the last good window survives.
+    const { ctx, session } = await harness()
+    recordContext(session, 'small', 64_000)
+    recordContext(session, 'forged', -5)
+    expect(pressure(ctx, session).contextWindow).toBe(64_000)
+  })
+
+  it('skips forged usage when folding pressure', async () => {
+    // Upstream #443: a poisoned usage record must not produce a pressure
+    // figure that the view's zod validation then rejects.
+    const { ctx, session } = await harness()
+    startStep(session, 1, 1)
+    usageChunk(session, { inputTokens: -100, outputTokens: 10 }, 1, 1)
+    expect(pressure(ctx, session)).toEqual({})
   })
 })

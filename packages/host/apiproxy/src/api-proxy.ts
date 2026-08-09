@@ -196,15 +196,40 @@ function err<T>(request: RpcRequest<unknown>, error: RpcError): RpcResponse<T> {
 }
 
 /** Simple async queue: core callbacks push, the AsyncIterable pulls; abort/return cleans up. */
+/**
+ * Per-connection frame cap before the oldest frames are evicted (upstream
+ * #475). A stalled/slow SSE client must not grow host memory without bound:
+ * telemetry already bounds its own queue at 2048, and this applies the same
+ * bound to the mux/host event queues. Evicting the OLDEST frames keeps a
+ * lagging client converging on recent state; answerable frames
+ * (approval/question) are pushed once per connection and replay on reconnect,
+ * so eviction never strands a pending question permanently.
+ */
+const DEFAULT_FRAME_QUEUE_MAX = 2048
+
 class FrameQueue<F> {
   private buffer: F[] = []
   private waiter: (() => void) | undefined
   private done = false
+  private dropped = 0
+
+  constructor(private readonly maxSize: number = DEFAULT_FRAME_QUEUE_MAX) {}
 
   push(item: F): void {
     if (this.done) return
+    if (this.buffer.length >= this.maxSize) {
+      // Stalled consumer: evict the oldest frame so the queue stays bounded.
+      // `dropped` lets tests/observers assert the eviction actually fired.
+      this.buffer.shift()
+      this.dropped += 1
+    }
     this.buffer.push(item)
     this.waiter?.()
+  }
+
+  /** Number of frames dropped to keep the queue within `maxSize`. */
+  get droppedCount(): number {
+    return this.dropped
   }
 
   end(): void {
