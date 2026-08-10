@@ -1,0 +1,69 @@
+{
+  "extends": "../../../tsconfig.base.client.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib/types"
+  },
+  "include": [
+    "src"
+  ],
+  "references": [
+    {
+      "path": "../../attachment/attachment"
+    },
+    {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../ui-slots"
+    },
+    {
+      "path": "../web-react"
+    },
+    {
+      "path": "../connection"
+    },
+    {
+      "path": "../schema-form"
+    },
+    {
+      "path": "../../host/apiproxy"
+    },
+    {
+      "path": "../../interaction/commands"
+    },
+    {
+      "path": "../../core/agent"
+    },
+    {
+      "path": "../../core/tools"
+    },
+    {
+      "path": "../../compact/compact"
+    },
+    {
+      "path": "../../session/session-projection"
+    },
+    {
+      "path": "../../session/session-title"
+    },
+    {
+      "path": "../../llm/llm"
+    },
+    {
+      "path": "../../llm/llm-retry"
+    },
+    {
+      "path": "../../support/invariants"
+    },
+    {
+      "path": "../../typert/type-meta"
+    },
+    {
+      "path": "../../typert/registry"
+    }
+  ],
+  "exclude": [
+    "**/*.legacy.*"
+  ]
+}
