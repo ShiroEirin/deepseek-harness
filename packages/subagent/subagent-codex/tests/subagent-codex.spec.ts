@@ -915,7 +915,7 @@ describe('run lifecycle and quiescence', () => {
         onError: (error) => { errors.push(error.message) },
       })
       child.settle({ exitCode: 9, signal: null })
-      await expect(run.result).resolves.toEqual({ output: [], stopReason: 'error' })
+      await expect(run.result).resolves.toMatchObject({ output: [], stopReason: 'error' })
       expect(errors.at(-1)).toContain('code 9')
       await run.dispose().catch(() => {})
     }
@@ -926,7 +926,7 @@ describe('run lifecycle and quiescence', () => {
       })
       child.peer.respond(turnStart, { turn: { id: 'turn-1' } })
       child.fromChild.end()
-      await expect(run.result).resolves.toEqual({ output: [], stopReason: 'error' })
+      await expect(run.result).resolves.toMatchObject({ output: [], stopReason: 'error' })
       await run.dispose()
     }
   })

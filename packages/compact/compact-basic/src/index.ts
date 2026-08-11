@@ -6,11 +6,20 @@
 
 import { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import { CompactService, ManualCompactionError } from '@deepseek-ai/dsh-compact'
-import type { CompactionResult, CompactionTrigger } from '@deepseek-ai/dsh-compact'
+import {
+  CompactService,
+  ManualCompactionError,
+} from '@deepseek-ai/dsh-compact'
+import type {
+  CompactionResult,
+  CompactionTrigger,
+} from '@deepseek-ai/dsh-compact'
 import type { TokenMeterService } from '@deepseek-ai/dsh-token-meter'
 import type { Session } from '@deepseek-ai/dsh-session'
-import { CONTEXT_WINDOW_EXCEEDED_CODE, assertNever } from '@deepseek-ai/dsh-llm'
+import {
+  CONTEXT_WINDOW_EXCEEDED_CODE,
+  assertNever,
+} from '@deepseek-ai/dsh-llm'
 import type { LlmCallConfig } from '@deepseek-ai/dsh-llm'
 import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
 import type { CommandId } from '@deepseek-ai/dsh-commands/brand'
@@ -46,14 +55,22 @@ export type {
 } from './types.ts'
 
 /** The region transaction's view of this service's dynamically dispatched summarizer. */
-type RegionSummarize = (input: SummarizationInput, agent: Agent, signal?: AbortSignal) => Promise<SummaryResult>
+type RegionSummarize = (
+  input: SummarizationInput,
+  agent: Agent,
+  signal?: AbortSignal,
+) => Promise<SummaryResult>
 
 /** Resolve the exact provider/model durably routed for the latest request. */
 function routedTarget(
   session: Session,
 ): Pick<LlmCallConfig, 'provider' | 'model'> | undefined {
   const config = session.requestHeader()?.config
-  if (config === undefined || config.provider.length === 0 || config.model.length === 0) {
+  if (
+    config === undefined ||
+    config.provider.length === 0 ||
+    config.model.length === 0
+  ) {
     return undefined
   }
   return { provider: config.provider, model: config.model }
@@ -65,8 +82,14 @@ function conversationTarget(
 ): Pick<LlmCallConfig, 'provider' | 'model'> | undefined {
   const routed = routedTarget(agent.session)
   if (routed !== undefined) return routed
-  if (agent.options.provider === undefined || agent.options.provider.length === 0
-    || agent.options.model === undefined || agent.options.model.length === 0) { return undefined }
+  if (
+    agent.options.provider === undefined ||
+    agent.options.provider.length === 0 ||
+    agent.options.model === undefined ||
+    agent.options.model.length === 0
+  ) {
+    return undefined
+  }
   return { provider: agent.options.provider, model: agent.options.model }
 }
 
@@ -138,31 +161,39 @@ export class BasicCompactService extends CompactService {
     const { ctx } = this
     const logResult = (result: CompactionResult, trigger: string): void => {
       ctx.logger.info(
-        `compaction (${trigger}): shadowed ${result.shadowedSeqs.length} surface nodes `
-        + `(seqs ${result.shadowedRange.start}-${result.shadowedRange.end}, `
-        + `~${result.shadowedTokenCount} tokens)`,
+        `compaction (${trigger}): shadowed ${result.shadowedSeqs.length} surface nodes ` +
+          `(seqs ${result.shadowedRange.start}-${result.shadowedRange.end}, ` +
+          `~${result.shadowedTokenCount} tokens)`,
       )
     }
 
-    ctx.on('agent/pre-step', async (
-      { agent, signal },
-      next,
-    ): Promise<PreStepDecision> => {
-      if (!signal.aborted) {
-        try {
-          const result = await this.compactIfNeeded(agent, 'pressure', signal)
-          if (result !== null) logResult(result, 'step pressure')
-        } catch (error: unknown) {
-          if (error instanceof TargetPressureConfigError) {
-            if (this.warnedPressureConfigTargets.has(error.targetKey)) return next()
-            this.warnedPressureConfigTargets.add(error.targetKey)
+    ctx.on(
+      'agent/pre-step',
+      async ({ agent, signal }, next): Promise<PreStepDecision> => {
+        if (!signal.aborted) {
+          try {
+            const result = await this.compactIfNeeded(
+              agent,
+              'pressure',
+              signal,
+            )
+            if (result !== null) logResult(result, 'step pressure')
+          } catch (error: unknown) {
+            if (error instanceof TargetPressureConfigError) {
+              if (this.warnedPressureConfigTargets.has(error.targetKey))
+                return next()
+              this.warnedPressureConfigTargets.add(error.targetKey)
+            }
+            const message =
+              error instanceof Error ? error.message : String(error)
+            ctx.logger.warn(
+              `step compaction failed: ${message}; continuing the turn`,
+            )
           }
-          const message = error instanceof Error ? error.message : String(error)
-          ctx.logger.warn(`step compaction failed: ${message}; continuing the turn`)
         }
-      }
-      return next()
-    })
+        return next()
+      },
+    )
 
     ctx.on('agent/status', ({ agent, status }) => {
       if (status === 'idle') this.overflowRetries.delete(agent)
@@ -176,11 +207,9 @@ export class BasicCompactService extends CompactService {
       if (agent !== undefined) this.overflowRetries.delete(agent)
     })
 
-    ctx.on('agent/request-error', async (
-      { agent, failure, signal },
-      next,
-    ) => {
-      if (failure.code !== CONTEXT_WINDOW_EXCEEDED_CODE || signal.aborted) return next()
+    ctx.on('agent/request-error', async ({ agent, failure, signal }, next) => {
+      if (failure.code !== CONTEXT_WINDOW_EXCEEDED_CODE || signal.aborted)
+        return next()
       this.overflowAgents.set(agent.session, agent)
       const target = routedTarget(agent.session)
       if (target === undefined) return next()
@@ -193,30 +222,41 @@ export class BasicCompactService extends CompactService {
       try {
         result = await this.compactIfNeeded(agent, 'context-overflow', signal)
       } catch (recoveryError: unknown) {
-        const message = recoveryError instanceof Error ? recoveryError.message : String(recoveryError)
+        const message =
+          recoveryError instanceof Error
+            ? recoveryError.message
+            : String(recoveryError)
         // A model-free prune can land before later summary work fails. That
         // durable reduction is sufficient retry proof; do not discard it just
         // because the optional second phase threw. Cancellation still wins.
         // oxlint-disable-next-line typescript/no-unnecessary-condition -- the signal can abort while recovery is awaited.
-        if (!signal.aborted && agent.session.surface.replaceGeneration > generation) {
+        if (
+          !signal.aborted &&
+          agent.session.surface.replaceGeneration > generation
+        ) {
           ctx.logger.warn(
-            `context-overflow compaction failed after durable surface progress: ${message}; `
-            + 'retrying from the replacement surface',
+            `context-overflow compaction failed after durable surface progress: ${message}; ` +
+              'retrying from the replacement surface',
           )
           this.overflowRetries.set(agent, retries + 1)
           return { kind: 'retry' }
         }
         ctx.logger.warn(
           // oxlint-disable-next-line typescript/no-unnecessary-condition -- the signal can abort while recovery is awaited.
-          `context-overflow compaction failed: ${message}; ${signal.aborted
-            ? 'cancellation prevents retry'
-            : 'preserving the original request error'}`,
+          `context-overflow compaction failed: ${message}; ${
+            signal.aborted
+              ? 'cancellation prevents retry'
+              : 'preserving the original request error'
+          }`,
         )
         return next()
       }
       // oxlint-disable-next-line typescript/no-unnecessary-condition -- the signal can abort while compaction is awaited.
-      if (signal.aborted
-        || agent.session.surface.replaceGeneration <= generation) return next()
+      if (
+        signal.aborted ||
+        agent.session.surface.replaceGeneration <= generation
+      )
+        return next()
       if (result !== null) logResult(result, 'context overflow recovery')
       this.overflowRetries.set(agent, retries + 1)
       return { kind: 'retry' }
@@ -239,9 +279,10 @@ export class BasicCompactService extends CompactService {
     signal?: AbortSignal,
   ): Promise<SummaryResult> {
     const target = conversationTarget(agent)
-    const config = target === undefined
-      ? this.config
-      : resolveTargetPolicy(this.config, target)
+    const config =
+      target === undefined
+        ? this.config
+        : resolveTargetPolicy(this.config, target)
     return summarizeWithLlm(this.ctx, config, input, agent, signal)
   }
 
@@ -290,14 +331,16 @@ export class BasicCompactService extends CompactService {
       return this.compactRegion(range.start, range.end, agent, signal)
     }
 
-    const context = (await this.ctx.llm.resolveModelInfo(target.provider, target.model, signal)).context
+    const context = (
+      await this.ctx.llm.resolveModelInfo(target.provider, target.model, signal)
+    ).context
     assertNoActiveCompaction(agent.session, 'automatic pressure compaction')
     const targetKey = `${target.provider}/${target.model}`
     if (context === undefined) {
       throw new TargetPressureConfigError(
         targetKey,
-        `compact-basic: no context capacity for ${targetKey}; `
-        + 'configure contextWindow on that adapter model',
+        `compact-basic: no context capacity for ${targetKey}; ` +
+          'configure contextWindow on that adapter model',
       )
     }
     const spec = resolveCompactSpec(policy, context.contextWindow)
@@ -313,7 +356,11 @@ export class BasicCompactService extends CompactService {
 
     let result: CompactionResult | null = null
     for (let attempt = 0; attempt <= spec.compactionRetries; attempt += 1) {
-      const range = selectCompactableRange(agent.session, measurement, spec.retainTokens)
+      const range = selectCompactableRange(
+        agent.session,
+        measurement,
+        spec.retainTokens,
+      )
       if (range === null) {
         /* v8 ignore else -- concrete replacement preserves a compactable checkpoint; subclass hooks cannot mutate it. */
         if (result === null) return null
@@ -326,8 +373,10 @@ export class BasicCompactService extends CompactService {
     }
 
     throw new Error(
-      `compaction still above threshold after ${spec.compactionRetries + 1} compaction attempts `
-      + `(${measurement.totalTokens} estimated tokens >= threshold ${spec.thresholdTokens})`,
+      `compaction still above threshold after ${
+        spec.compactionRetries + 1
+      } compaction attempts ` +
+        `(${measurement.totalTokens} estimated tokens >= threshold ${spec.thresholdTokens})`,
     )
   }
 
@@ -370,7 +419,9 @@ export class BasicCompactService extends CompactService {
     signal: AbortSignal,
     sourceCommandId?: CommandId,
   ): Promise<CompactionResult | null> {
-    signal.throwIfAborted()
+    if (signal.aborted) {
+      return Promise.reject(signal.reason)
+    }
     try {
       return agent.runMaintenance(async (agentSignal) => {
         const operationSignal = AbortSignal.any([agentSignal, signal])
@@ -391,7 +442,7 @@ export class BasicCompactService extends CompactService {
             {
               owner: null,
               stability: 'selected-span',
-              ...sourceCommandId === undefined ? {} : { sourceCommandId },
+              ...(sourceCommandId === undefined ? {} : { sourceCommandId }),
               flush: async () => {
                 await this.ctx.sessions.flush(agent.session)
               },
@@ -399,7 +450,10 @@ export class BasicCompactService extends CompactService {
             operationSignal,
           )
         } catch (error: unknown) {
-          if (agentSignal.aborted && operationSignal.reason === agentSignal.reason) {
+          if (
+            agentSignal.aborted &&
+            operationSignal.reason === agentSignal.reason
+          ) {
             throw new ManualCompactionError(
               'cancelled',
               'manual compaction was cancelled',
@@ -420,7 +474,10 @@ export class BasicCompactService extends CompactService {
   }
 
   /** Bind the effective token meter and dynamically dispatched summarizer hook. */
-  private regionDependencies(): { meter: TokenMeterService; summarize: RegionSummarize } {
+  private regionDependencies(): {
+    meter: TokenMeterService
+    summarize: RegionSummarize
+  } {
     return {
       meter: this.ctx.tokenMeter,
       summarize: (input, owner, abort) => this.summarize(input, owner, abort),

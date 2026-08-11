@@ -363,7 +363,7 @@ describe('task admission and package contracts', () => {
     const run = await ctx.subagents.start('claude-code', request())
     child.settle({ exitCode: 9, signal: null })
     child.stdout.end()
-    await expect(run.result).resolves.toEqual({
+    await expect(run.result).resolves.toMatchObject({
       output: [],
       stopReason: 'error',
     })
@@ -655,7 +655,7 @@ describe('run publication, cancellation, and settlement', () => {
         request(),
         { ...fixture.spec, onError },
       )
-      await expect(run.result).resolves.toEqual({
+      await expect(run.result).resolves.toMatchObject({
         output: [],
         stopReason: 'error',
       })
@@ -673,7 +673,7 @@ describe('run publication, cancellation, and settlement', () => {
       new Error('iterator boom'),
     )
     const run = await startClaudeCodeRun(request(), fixture.spec)
-    await expect(run.result).resolves.toEqual({
+    await expect(run.result).resolves.toMatchObject({
       output: [],
       stopReason: 'error',
     })

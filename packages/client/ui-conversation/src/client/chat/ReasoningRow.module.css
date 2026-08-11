@@ -61,6 +61,10 @@
   white-space: nowrap;
 }
 
+.summary[data-follow-end] {
+  text-overflow: clip;
+}
+
 .thinkBody {
   padding: 4px 0 4px 22px;
   color: var(--dsw-alias-label-tertiary);
