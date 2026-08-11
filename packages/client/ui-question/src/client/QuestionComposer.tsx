@@ -1,4 +1,4 @@
-import { useMemo, useState, type ChangeEvent, type KeyboardEvent } from 'react'
+import { useEffect, useMemo, useState, type ChangeEvent, type KeyboardEvent } from 'react'
 import clsx from 'clsx'
 import {
   Button, IconCheckOutline14, IconChevronLeftOutline14, IconChevronRightOutline14,
@@ -16,6 +16,16 @@ interface DraftAnswer {
   custom: string
   skipped: boolean
 }
+
+/**
+ * Per-request draft cache. The composer chain seat is session-scoped and the
+ * carrier mount is keyed by sessionId, so switching sessions unmounts and
+ * remounts the flow; this module-level cache restores the in-progress answers
+ * for the SAME pending request (stable wait key), mirroring the main
+ * composer's per-session draft persistence (#327). Entries are dropped once
+ * the request settles (answered or cancelled).
+ */
+const draftCache = new Map<string, DraftAnswer[]>()
 
 /**
  * Displayed feedback: validation feedback is stored as a dictionary KEY and
@@ -70,9 +80,16 @@ export function QuestionComposer(props: QuestionComposerProps) {
 function QuestionFlow({ pending, t }: { pending: PendingQuestion } & Pick<QuestionComposerProps, 't'>) {
   const questions = pending.questions
   const [index, setIndex] = useState(0)
-  const [drafts, setDrafts] = useState<DraftAnswer[]>(() => questions.map(() => ({
-    selected: [], custom: '', skipped: false,
-  })))
+  const [drafts, setDrafts] = useState<DraftAnswer[]>(() => {
+    const cached = draftCache.get(pending.key)
+    if (cached !== undefined && cached.length === questions.length) return cached
+    return questions.map(() => ({ selected: [], custom: '', skipped: false }))
+  })
+  // Mirror every edit into the cache so a remount after a session switch
+  // restores it; the request key keeps different pending requests apart.
+  useEffect(() => {
+    draftCache.set(pending.key, drafts)
+  }, [drafts, pending.key])
   const [busy, setBusy] = useState<'answer' | 'cancel' | null>(null)
   const [error, setError] = useState<Feedback | null>(null)
   // index stays in bounds (every setIndex site clamps) and drafts mirrors questions 1:1.
@@ -85,10 +102,12 @@ function QuestionFlow({ pending, t }: { pending: PendingQuestion } & Pick<Questi
   const cancelFlow = (): void => {
     setBusy('cancel')
     setError(null)
-    void pending.cancel().catch((cause: unknown) => {
-      setBusy(null)
-      setError({ text: cause instanceof Error ? cause.message : String(cause) })
-    })
+    void pending.cancel()
+      .then(() => { draftCache.delete(pending.key) })
+      .catch((cause: unknown) => {
+        setBusy(null)
+        setError({ text: cause instanceof Error ? cause.message : String(cause) })
+      })
   }
 
   const updateDraft = (update: (current: DraftAnswer) => DraftAnswer): void => {
@@ -137,10 +156,12 @@ function QuestionFlow({ pending, t }: { pending: PendingQuestion } & Pick<Questi
     }
     setBusy('answer')
     setError(null)
-    void pending.answer(answer).catch((cause: unknown) => {
-      setBusy(null)
-      setError({ text: cause instanceof Error ? cause.message : String(cause) })
-    })
+    void pending.answer(answer)
+      .then(() => { draftCache.delete(pending.key) })
+      .catch((cause: unknown) => {
+        setBusy(null)
+        setError({ text: cause instanceof Error ? cause.message : String(cause) })
+      })
   }
 
   const continueFlow = (): void => {

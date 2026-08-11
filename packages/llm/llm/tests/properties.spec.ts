@@ -89,16 +89,18 @@ describe('BlockAssembler properties', () => {
     }))
   })
 
-  it('finish reflects the last finish chunk, or defaults to stop when none arrives', () => {
+  it('finish reflects the first finish chunk, or defaults to stop when none arrives', () => {
     fc.assert(fc.property(streamArb, (chunks) => {
       const a = feed(chunks)
       const finishes = chunks.filter(c => c.type === 'finish')
       if (finishes.length === 0) {
         expect(a.finish).toEqual({ kind: 'stop' })
       } else {
-        // last-write-wins: the assembler keeps the most recent finish reason.
-        const last = finishes[finishes.length - 1]
-        if (last?.type === 'finish') expect(a.finish).toEqual(last.reason)
+        // first-finish-wins: a finish chunk is terminal (upstream #438);
+        // anything pushed after it is protocol garbage and must neither
+        // enter the assembled message nor overwrite the terminal reason.
+        const first = finishes[0]
+        if (first?.type === 'finish') expect(a.finish).toEqual(first.reason)
       }
     }))
   })

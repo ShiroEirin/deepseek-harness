@@ -9,7 +9,10 @@
  */
 
 import { Context, Service } from 'cordis'
-import type { SandboxExecutionPolicy, SandboxMode } from '@deepseek-ai/dsh-sandbox'
+import type {
+  SandboxExecutionPolicy,
+  SandboxMode,
+} from '@deepseek-ai/dsh-sandbox'
 import type {
   FsDirEntry,
   FsEditOutcome,
@@ -23,11 +26,7 @@ import type {
   FsWriteOutcome,
 } from './types.ts'
 
-export {
-  FsError,
-  FsTargetKey,
-  FsVersion,
-} from './types.ts'
+export { FsError, FsTargetKey, FsVersion } from './types.ts'
 export type {
   FsEditOutcome,
   FsEditRequest,
@@ -55,7 +54,11 @@ declare module 'cordis' {
      * @param actor - the opaque tool-execution context the decider keys off.
      * @mode waterfall
      */
-    'fs/write-intent'(target: FsTarget, actor: object | undefined, next: () => FsWriteIntent | undefined | Promise<FsWriteIntent | undefined>): Promise<FsWriteIntent | undefined>
+    'fs/write-intent'(
+      target: FsTarget,
+      actor: object | undefined,
+      next: () => FsWriteIntent | undefined | Promise<FsWriteIntent | undefined>
+    ): Promise<FsWriteIntent | undefined>
     /**
      * Single-slot decision for the next {@link FileSystem.editText}. Calling
      * `next()` yields an unconditional edit; the first returned guard wins.
@@ -63,7 +66,14 @@ declare module 'cordis' {
      * @param actor - the opaque tool-execution context the decider keys off.
      * @mode waterfall
      */
-    'fs/edit-intent'(target: FsTarget, actor: object | undefined, next: () => { version: FsVersion } | undefined | Promise<{ version: FsVersion } | undefined>): Promise<{ version: FsVersion } | undefined>
+    'fs/edit-intent'(
+      target: FsTarget,
+      actor: object | undefined,
+      next: () =>
+        | { version: FsVersion }
+        | undefined
+        | Promise<{ version: FsVersion } | undefined>
+    ): Promise<{ version: FsVersion } | undefined>
     /**
      * Record an authoritative positive or negative observation. Listeners must
      * be synchronous recorders: throws fail the tool call and returned promises
@@ -73,7 +83,14 @@ declare module 'cordis' {
      * @param actor - the observing tool-execution context; undefined records nothing useful.
      * @mode emit
      */
-    'fs/observed'(target: FsTarget, observation: FsObservation, actor: object | undefined): void
+    'fs/observed'(
+      target: FsTarget,
+      observation: FsObservation,
+      actor: object | undefined
+    ): void
+    /** Drop this owner's stale observation after a failed read so the next write
+     *  decides createIfAbsent instead of replaceIfVersion(stale) forever. */
+    'fs/observed-clear'(target: FsTarget, actor: object | undefined): void
   }
 }
 
@@ -113,7 +130,10 @@ export abstract class FileSystem extends Service {
    * @param opts - optional cwd override and cancellation signal.
    * @returns the stable target; the same file yields the same `targetKey`.
    */
-  abstract resolve(path: string, opts?: { cwd?: string; signal?: AbortSignal }): Promise<FsTarget>
+  abstract resolve(
+    path: string,
+    opts?: { cwd?: string; signal?: AbortSignal }
+  ): Promise<FsTarget>
 
   /**
    * Return the canonical absolute path a subprocess in this filesystem's
@@ -149,7 +169,10 @@ export abstract class FileSystem extends Service {
    * @param signal - aborts the metadata round-trip.
    * @returns metadata only, never content; undefined for an absent target.
    */
-  abstract stat(target: FsTarget, signal?: AbortSignal): Promise<FsInfo | undefined>
+  abstract stat(
+    target: FsTarget,
+    signal?: AbortSignal
+  ): Promise<FsInfo | undefined>
 
   /**
    * Return path metadata without following the final path component when it is a
@@ -165,7 +188,11 @@ export abstract class FileSystem extends Service {
    * @param signal - aborts the metadata round-trip.
    * @returns metadata only, never content; undefined for an absent path.
    */
-  abstract lstat(path: string, opts?: { cwd?: string }, signal?: AbortSignal): Promise<FsPathInfo | undefined>
+  abstract lstat(
+    path: string,
+    opts?: { cwd?: string },
+    signal?: AbortSignal
+  ): Promise<FsPathInfo | undefined>
 
   /**
    * Read the whole regular text file as a single decoded string.
@@ -184,7 +211,10 @@ export abstract class FileSystem extends Service {
    * @param signal - aborts the stream, including between chunks.
    * @returns the chunk iterable, decoded and validated like {@link readText}.
    */
-  abstract streamText(target: FsTarget, signal?: AbortSignal): Promise<AsyncIterable<string>>
+  abstract streamText(
+    target: FsTarget,
+    signal?: AbortSignal
+  ): Promise<AsyncIterable<string>>
 
   /**
    * List direct children of a directory in stable name order. Returns resolved
@@ -193,7 +223,10 @@ export abstract class FileSystem extends Service {
    * @param signal - aborts the listing.
    * @returns one entry per direct child, in stable name order.
    */
-  abstract listDir(target: FsTarget, signal?: AbortSignal): Promise<FsDirEntry[]>
+  abstract listDir(
+    target: FsTarget,
+    signal?: AbortSignal
+  ): Promise<FsDirEntry[]>
 
   /**
    * Atomically create or replace UTF-8 text. `expected` guards intent and
@@ -212,7 +245,7 @@ export abstract class FileSystem extends Service {
     content: string,
     expected?: FsWriteIntent,
     signal?: AbortSignal,
-    sandboxPolicy?: SandboxExecutionPolicy,
+    sandboxPolicy?: SandboxExecutionPolicy
   ): Promise<FsWriteOutcome>
 
   /**
@@ -233,7 +266,7 @@ export abstract class FileSystem extends Service {
     edit: FsEditRequest,
     expected?: { version: FsVersion },
     signal?: AbortSignal,
-    sandboxPolicy?: SandboxExecutionPolicy,
+    sandboxPolicy?: SandboxExecutionPolicy
   ): Promise<FsEditOutcome>
 }
 

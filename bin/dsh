@@ -17,10 +17,14 @@ root=$(CDPATH='' cd -- "$(dirname -- "$script")/.." && pwd)
 
 # The ESM-only tsx hook transforms TypeScript and projects this checkout's
 # tsconfig paths into Node resolution (the CJS hook stays off: the graph is
-# ESM-only and the CJS resolver costs ~0.4s of startup). Absolute paths keep
-# both the hook and the tsconfig anchored to this checkout when the launcher
-# runs from any cwd, where bare `tsx/esm` would not resolve.
+# ESM-only and the CJS resolver costs ~0.4s of startup). The launcher chdirs
+# into the checkout so every path below stays RELATIVE: an MSYS absolute path
+# like /c/Users/... passed to node --import on Windows is read by the ESM
+# loader as the URL scheme 'c:' and crashes with ERR_UNSUPPORTED_ESM_URL_SCHEME
+# (upstream #388). Relative paths keep the hook and tsconfig anchored to this
+# checkout from any cwd on every platform.
+cd -- "$root"
 NODE_USE_ENV_PROXY=1 \
-  TSX_TSCONFIG_PATH="$root/tsconfig.json" \
-  exec node --import "$root/node_modules/tsx/dist/esm/index.mjs" \
-  "$root/apps/cli/src/bin.ts" "$@"
+  TSX_TSCONFIG_PATH="./tsconfig.json" \
+  exec node --import ./node_modules/tsx/dist/esm/index.mjs \
+  ./apps/cli/src/bin.ts "$@"

@@ -31,6 +31,7 @@ function runOutcome(result: SubagentResult): TaskOutcome {
     case 'aborted':
       return { status: 'killed' }
     case 'error':
+      return { status: 'failed', detail: result.error ?? result.stopReason }
     case 'max-tokens':
     case 'refusal':
       return { status: 'failed', detail: result.stopReason }

@@ -162,13 +162,15 @@ export async function settleRunResult(parts: RunResultSettlement): Promise<Subag
   } catch (error: unknown) {
     // Cover a rejection already queued when cancellation arrives.
     if (parts.cancelled()) return { output: parts.collectOutput(), stopReason: 'aborted' }
-    // Flatten post-publication transport failures while preserving diagnostics.
+    // Flatten post-publication transport failures while preserving diagnostics:
+    // the original error message rides on the result so the model-facing tool
+    // can distinguish environment faults, rejected approvals, and crashes.
     try {
       parts.onError?.(toError(error), 'error')
     } catch {
       // The diagnostic sink cannot reject the run result.
     }
-    return { output: parts.collectOutput(), stopReason: 'error' }
+    return { output: parts.collectOutput(), stopReason: 'error', error: toError(error).message }
   } finally {
     parts.signal.removeEventListener('abort', parts.onAbort)
   }

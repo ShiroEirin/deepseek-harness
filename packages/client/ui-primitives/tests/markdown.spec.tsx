@@ -479,6 +479,14 @@ describe('MarkdownText', () => {
     expect(live.container.querySelectorAll('.katex-display')).toHaveLength(1)
     expect(live.container.querySelector('.katex-error')).toBeNull()
   })
+
+  it('does not pair two stray single tildes (HOME=~/x … USER=~/y) as strikethrough, but keeps ~~double~~', () => {
+    const source = 'HOME=~/x 与 USER=~/y，以及 ~~真删除线~~ 和 ~单~'
+    const { container } = render(<MarkdownText text={source} />)
+    expect(container.querySelector('del')?.textContent).toBe('真删除线')
+    expect(container.textContent).toContain('HOME=~/x')
+    expect(container.textContent).toContain('USER=~/y')
+  })
 })
 
 describe('JsonBlock', () => {

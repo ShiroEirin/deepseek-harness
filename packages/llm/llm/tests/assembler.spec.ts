@@ -145,3 +145,33 @@ describe('BlockAssembler duplicate-close contract', () => {
     expect(assembler.blocks()).toEqual([{ type: 'reasoning', text: 'first' }])
   })
 })
+
+
+describe('BlockAssembler finish terminality (upstream issue #438)', () => {
+  it('ignores chunks pushed after a finish chunk', () => {
+    const assembler = new BlockAssembler()
+    assembler.push({ type: 'text-delta', index: 0, text: 'kept' })
+    assembler.push({ type: 'finish', reason: { kind: 'stop' } })
+    // Protocol garbage after finish must neither enter blocks nor change finish.
+    assembler.push({ type: 'text-delta', index: 0, text: 'dropped' })
+    assembler.push({ type: 'block-end', index: 0, block: { type: 'text', text: 'dropped' } })
+    expect(assembler.blocks()).toEqual([{ type: 'text', text: 'kept' }])
+    expect(assembler.finish).toEqual({ kind: 'stop' })
+  })
+
+  it('keeps the first finish reason: a later stop cannot overwrite an error finish', () => {
+    const assembler = new BlockAssembler()
+    assembler.push({ type: 'finish', reason: { kind: 'error', failure: { message: 'boom', code: 'UPSTREAM' } } })
+    assembler.push({ type: 'finish', reason: { kind: 'stop' } })
+    expect(assembler.finish).toEqual({ kind: 'error', failure: { message: 'boom', code: 'UPSTREAM' } })
+  })
+
+  it('ignores a tool-call block pushed after finish so it can never be executed', () => {
+    const assembler = new BlockAssembler()
+    assembler.push({ type: 'finish', reason: { kind: 'stop' } })
+    assembler.push({ type: 'block-start', index: 0, blockType: 'tool-call' })
+    assembler.push({ type: 'tool-call-delta', index: 0, id: CallId('c1'), name: 'echo', argumentsDelta: '{}' })
+    assembler.push({ type: 'block-end', index: 0, block: { type: 'tool-call', id: CallId('c1'), name: 'echo', arguments: '{}' } })
+    expect(assembler.blocks()).toEqual([])
+  })
+})

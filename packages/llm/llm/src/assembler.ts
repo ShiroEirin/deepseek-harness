@@ -39,12 +39,17 @@ export class BlockAssembler {
   private _usage: TokenUsage | undefined
   private _finish: FinishReason | undefined
   private _replayState: unknown = undefined
+  private _finished = false
 
   /**
    * Feed one chunk into the assembly state.
    * @param chunk - the next raw chunk, in stream order.
    */
   push(chunk: StreamChunk): void {
+    // A finish chunk is terminal: anything pushed after it is protocol
+    // garbage and must neither enter the assembled message nor overwrite
+    // the terminal reason (upstream issue #438). The first finish wins.
+    if (this._finished) return
     switch (chunk.type) {
       case 'block-start': {
         if (!this.partials.has(chunk.index)) {
@@ -85,6 +90,7 @@ export class BlockAssembler {
         return
       }
       case 'finish': {
+        this._finished = true
         this._finish = chunk.reason
         this._replayState = chunk.replayState
         return

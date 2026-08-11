@@ -73,7 +73,7 @@ function answeredEnvelope(rpcId: string, answers: object[]) {
 
 describe('QuestionComposer', () => {
   it('collects single, custom, and multi-select answers before one batch submit', () => {
-    const { carrier, respond } = wait()
+    const { carrier, respond } = wait('c1')
     render(<QuestionComposer matched={carrier} interactions={[carrier]} {...kit} />)
 
     expect(screen.getByText('偏好')).toBeTruthy()
@@ -113,7 +113,7 @@ describe('QuestionComposer', () => {
     fireEvent.keyDown(multiCustom, { key: 'Enter' })
 
     // The domain face encoded the whole batch into one carrier envelope.
-    expect(respond).toHaveBeenCalledWith(answeredEnvelope('question-1', [
+    expect(respond).toHaveBeenCalledWith(answeredEnvelope('c1', [
       { id: 'profile', selected: ['工程落地型 (Recommended)'] },
       { id: 'detail', selected: [], custom: '要能独立排查线上问题' },
       { id: 'signals', selected: ['系统设计', '代码质量', '产品判断'], custom: '沟通能力' },
@@ -145,7 +145,7 @@ describe('QuestionComposer', () => {
   })
 
   it('skips individual questions without discarding earlier answers', () => {
-    const { carrier, respond } = wait()
+    const { carrier, respond } = wait('c2')
     render(<QuestionComposer matched={carrier} interactions={[carrier]} {...kit} />)
 
     expect((screen.getByText('下一题').closest('button') as HTMLButtonElement).disabled).toBe(true)
@@ -155,7 +155,7 @@ describe('QuestionComposer', () => {
     expect(screen.getByText('3 / 3')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '跳过本题' }))
 
-    expect(respond).toHaveBeenCalledWith(answeredEnvelope('question-1', [
+    expect(respond).toHaveBeenCalledWith(answeredEnvelope('c2', [
       { id: 'profile', selected: ['研究潜力型'] },
       { id: 'detail', selected: [] },
       { id: 'signals', selected: [] },
@@ -163,7 +163,7 @@ describe('QuestionComposer', () => {
   })
 
   it('keeps IME Enter inside the custom input until composition finishes', () => {
-    const { carrier, respond } = wait()
+    const { carrier, respond } = wait('c3')
     render(<QuestionComposer matched={carrier} interactions={[carrier]} {...kit} />)
 
     fireEvent.click(screen.getByRole('radio', { name: '研究潜力型' }))
@@ -183,7 +183,7 @@ describe('QuestionComposer', () => {
   })
 
   it('shows the inline custom input, reports missing answers, and supports pager navigation', () => {
-    const { carrier, respond } = wait()
+    const { carrier, respond } = wait('c4')
     render(<QuestionComposer matched={carrier} interactions={[carrier]} {...kit} />)
 
     expect(screen.getByPlaceholderText('输入你的答案')).toBeTruthy()
@@ -208,7 +208,7 @@ describe('QuestionComposer', () => {
     const respond = vi.fn()
       .mockResolvedValueOnce({ accepted: false, reason: 'bad-response' })
       .mockRejectedValueOnce(new Error('第二次取消失败'))
-    const { carrier } = wait('question-1', respond)
+    const { carrier } = wait('c5', respond)
     render(<QuestionComposer matched={carrier} interactions={[carrier]} {...kit} />)
 
     // Receipt rejection surfaces through the domain face's thrown message.
@@ -270,6 +270,25 @@ describe('QuestionComposer', () => {
     const replayed = wait('same-id')
     view.rerender(<QuestionComposer matched={replayed.carrier} interactions={[replayed.carrier]} {...kit} />)
     expect(screen.getByText('2 / 3')).toBeTruthy()
+  })
+
+  it('restores in-progress drafts across a session switch (unmount/remount)', () => {
+    // The regression: switching sessions unmounts the composer (key=sessionId)
+    // and the local useState was re-initialized empty, so the typed text was
+    // lost while the question stayed pending (#327).
+    const { carrier } = wait('session-switch')
+    const view = render(<QuestionComposer matched={carrier} interactions={[carrier]} {...kit} />)
+    fireEvent.click(screen.getByRole('radio', { name: /工程落地型/ }))
+    const custom = screen.getByPlaceholderText('输入你的答案')
+    fireEvent.change(custom, { target: { value: '要能独立排查线上问题' } })
+
+    // Session switch: the seat unmounts (key=sessionId changes), then the
+    // SAME pending request is selected again — the composer remounts.
+    view.unmount()
+    render(<QuestionComposer matched={carrier} interactions={[carrier]} {...kit} />)
+    fireEvent.click(screen.getByRole('radio', { name: /工程落地型/ }))
+    expect((screen.getByPlaceholderText('输入你的答案') as HTMLInputElement).value)
+      .toBe('要能独立排查线上问题')
   })
 })
 

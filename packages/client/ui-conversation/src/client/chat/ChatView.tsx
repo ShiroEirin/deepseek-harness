@@ -169,6 +169,10 @@ export function ChatView({
   const listRef = useRef<HTMLDivElement | null>(null)
   const columnRef = useRef<HTMLDivElement | null>(null)
   const atBottomRef = useRef(true)
+  /** Follow is armed only flush with the true floor (<=1px): a small upward
+   *  wheel move inside the chrome FOLLOW_THRESHOLD band still disarms it, so
+   *  the next streamed chunk cannot yank the reader back (upstream #220). */
+  const followArmedRef = useRef(true)
   const [atBottom, setAtBottom] = useState(true)
   /** Last position delivered or written on the main thread. */
   const observedTopRef = useRef(0)
@@ -196,6 +200,7 @@ export function ChatView({
     el.scrollTop = el.scrollHeight
     observedTopRef.current = el.scrollTop
     atBottomRef.current = true
+    followArmedRef.current = true
     setAtBottom(true)
     chatScroll.save(null)
   }
@@ -218,8 +223,10 @@ export function ChatView({
         const row = anchorElement(local, saved.anchorKey)
         if (row !== null) el.scrollTop += flowTop(row, el) - saved.anchorTop
         observedTopRef.current = el.scrollTop
-        const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= FOLLOW_THRESHOLD + 1
+        const distanceToBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+        const isAtBottom = distanceToBottom <= FOLLOW_THRESHOLD + 1
         atBottomRef.current = isAtBottom
+        followArmedRef.current = distanceToBottom <= 1
         setAtBottom(isAtBottom)
         const normalized = isAtBottom ? null : scrollPosition(local, el)
         if (isAtBottom) chatScroll.save(null)
@@ -240,6 +247,8 @@ export function ChatView({
       const row = anchorElement(local, anchor.key)
       if (row !== null) el.scrollTop += flowTop(row, el) - anchor.top
       observedTopRef.current = el.scrollTop
+      followArmedRef.current =
+        el.scrollHeight - el.scrollTop - el.clientHeight <= 1
       firstSeqRef.current = firstSeq
       /* v8 ignore next -- ?? arm: a prepend adds nodes, so the flow list here is never empty. */
       lastKeyRef.current = lastKey
@@ -258,7 +267,12 @@ export function ChatView({
     followSigRef.current = followSig
     // Follow new flow content while pinned; do NOT re-pin on every render
     // merely because atBottomRef is true (scroll threshold → setState → snap).
-    if (appendedUser || appendedSteering || (tipMoved && atBottomRef.current)) toBottom(el)
+    if (
+      appendedUser ||
+      appendedSteering ||
+      (tipMoved && followArmedRef.current)
+    )
+      toBottom(el)
   })
 
   const onScrollRef = useRef(() => {})
@@ -283,6 +297,13 @@ export function ChatView({
       toBottom(el)
       return
     }
+    // issue #220: reader input arms follow only at the true floor (<=1px),
+    // never inside the 24px chrome band, so a small upward scroll keeps the
+    // reader's position across the next streamed chunk. Programmatic scrolls
+    // (content growth) preserve the current armed state.
+    followArmedRef.current = movedByReader
+      ? floor - el.scrollTop <= 1
+      : followArmedRef.current
     atBottomRef.current = isAtBottom
     setAtBottom(isAtBottom)
     const position = isAtBottom ? null : scrollPosition(local, el)
@@ -318,7 +339,7 @@ export function ChatView({
   const followRef = useRef<(() => void) | null>(null)
   followRef.current = () => {
     const local = listRef.current
-    if (local !== null && atBottomRef.current) {
+    if (local !== null && followArmedRef.current) {
       const el = scrollerOf(local)
       el.scrollTop = el.scrollHeight
       observedTopRef.current = el.scrollTop

@@ -109,6 +109,8 @@ const PRIVILEGED_METHODS = new Set([
   'agentPreset.remove',
   'host.pickDirectory',
   'host.openPath',
+  'host.listDirectory',
+  'host.createDirectory',
   'settings.describe',
   'settings.openDocument',
   'settings.update',
