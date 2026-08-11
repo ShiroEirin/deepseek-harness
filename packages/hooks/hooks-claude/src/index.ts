@@ -98,6 +98,7 @@ export function apply(ctx: Context, config: Config): void {
   const stderrSummaryMaxChars = config.stderrSummaryMaxChars ?? DEFAULT_STDERR_SUMMARY_MAX_CHARS
   assertPositiveInteger('stderrSummaryMaxChars', stderrSummaryMaxChars)
   const defaultTimeoutMs = config.defaultTimeoutMs ?? DEFAULT_HOOK_TIMEOUT_MS
+  assertPositiveInteger('defaultTimeoutMs', defaultTimeoutMs)
   // Parse once at load. A read or parse failure logs and registers nothing.
   let parsed: ClaudeHookConfig = {}
   try {
@@ -160,7 +161,7 @@ export function apply(ctx: Context, config: Config): void {
             ...group.matcher !== undefined ? { matcher: group.matcher } : {},
           })
         }
-        const { output, durationMs } = await runHook(ctx.bash, hook, {
+        const { output, durationMs, completed } = await runHook(ctx.bash, hook, {
           payload,
           defaultTimeoutMs,
           ...hookEnv ? { env: hookEnv } : {},
@@ -179,7 +180,7 @@ export function apply(ctx: Context, config: Config): void {
           ctx.logger.warn(`hooks-claude: ${point} hook emitted a systemMessage, which is not yet surfaced (ignored)`)
         }
         if (session && opts.turn !== undefined) {
-          appendHookResult(session, { turn: opts.turn, point, handlerId, output, stderrSummaryMaxChars, durationMs })
+          appendHookResult(session, { turn: opts.turn, point, handlerId, output, stderrSummaryMaxChars, durationMs, completed })
         }
       }
     }

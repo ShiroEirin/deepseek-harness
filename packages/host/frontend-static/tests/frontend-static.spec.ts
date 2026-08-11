@@ -38,17 +38,20 @@ async function loadComposition(): Promise<Context> {
   await writeFile(join(dist, 'blob.bin'), 'BLOB')
   await writeFile(join(dist, 'manifest.webmanifest'), '{}')
   const configPath = join(root, 'cordis.yml')
-  await writeFile(configPath, [
-    "- name: '@deepseek-ai/dsh-host-webserver'",
-    '  config:',
-    "    host: '127.0.0.1'",
-    '    port: 0',
-    '- id: frontend',
-    "  name: '@deepseek-ai/dsh-frontend-static'",
-    '  config:',
-    `    distIndex: '${distIndex}'`,
-    '',
-  ].join('\n'))
+  await writeFile(
+    configPath,
+    [
+      "- name: '@deepseek-ai/dsh-host-webserver'",
+      '  config:',
+      "    host: '127.0.0.1'",
+      '    port: 0',
+      '- id: frontend',
+      "  name: '@deepseek-ai/dsh-frontend-static'",
+      '  config:',
+      `    distIndex: '${distIndex}'`,
+      '',
+    ].join('\n'),
+  )
 
   context = new Context()
   context.baseUrl = pathToFileURL(root).href + '/'
@@ -61,7 +64,9 @@ async function loadComposition(): Promise<Context> {
   context.loader.internal = {
     version: 'v2',
     async import(specifier: string) {
-      if (!modules.has(specifier)) { throw new Error(`unexpected Loader import: ${specifier}`) }
+      if (!modules.has(specifier)) {
+        throw new Error(`unexpected Loader import: ${specifier}`)
+      }
       return modules.get(specifier)
     },
   } as unknown as NonNullable<typeof context.loader.internal>
@@ -74,60 +79,104 @@ async function loadComposition(): Promise<Context> {
 }
 
 /** GET (by default) one path against the running server; returns status, content-type, and a body prefix. */
-async function request(port: number, path: string, init?: RequestInit): Promise<{ status: number; type: string | null; body: string }> {
+async function request(
+  port: number,
+  path: string,
+  init?: RequestInit,
+): Promise<{
+  status: number
+  type: string | null
+  body: string
+  headers: Record<string, string>
+}> {
   const response = await fetch(`http://127.0.0.1:${String(port)}${path}`, init)
   return {
     status: response.status,
     type: response.headers.get('content-type'),
     body: (await response.text()).slice(0, 80),
+    headers: Object.fromEntries(response.headers),
   }
 }
 
 describe('real Loader composition', () => {
-  it('serves the dist with SPA fallback, taps, traversal rejection, and method gating', { timeout: 60_000 }, async () => {
-    const loaded = await loadComposition()
-    const unloaded = [...loaded.loader.entries()]
-      .filter(entry => entry.fiber === undefined && !entry.disabled)
-      .map(entry => entry.options.name)
-    expect(unloaded).toEqual([])
-    const server = loaded.httpServer
-    const port = server.port
+  it(
+    'serves the dist with SPA fallback, taps, traversal rejection, and method gating',
+    { timeout: 60_000 },
+    async () => {
+      const loaded = await loadComposition()
+      const unloaded = [...loaded.loader.entries()]
+        .filter(entry => entry.fiber === undefined && !entry.disabled)
+        .map(entry => entry.options.name)
+      expect(unloaded).toEqual([])
+      const server = loaded.httpServer
+      const port = server.port
 
-    // Real assets with their MIME types; a live rebuild is served on the next read.
-    expect(await request(port, '/app.js')).toMatchObject({ status: 200, type: 'text/javascript; charset=utf-8', body: 'export {}' })
-    expect(await request(port, '/manifest.webmanifest')).toMatchObject({
-      status: 200,
-      type: 'application/manifest+json',
-      body: '{}',
-    })
-    await writeFile(join(root!, 'dist', 'app.js'), 'export const rebuilt = true')
-    expect(await request(port, '/app.js')).toMatchObject({ status: 200, body: 'export const rebuilt = true' })
+      // Real assets with their MIME types; a live rebuild is served on the next read.
+      expect(await request(port, '/app.js')).toMatchObject({
+        status: 200,
+        type: 'text/javascript; charset=utf-8',
+        body: 'export {}',
+      })
+      expect(await request(port, '/manifest.webmanifest')).toMatchObject({
+        status: 200,
+        type: 'application/manifest+json',
+        body: '{}',
+      })
+      await writeFile(
+        join(root!, 'dist', 'app.js'),
+        'export const rebuilt = true',
+      )
+      expect(await request(port, '/app.js')).toMatchObject({
+        status: 200,
+        body: 'export const rebuilt = true',
+      })
 
-    // Unknown extension ships as octet-stream.
-    expect(await request(port, '/blob.bin')).toMatchObject({ status: 200, type: 'application/octet-stream', body: 'BLOB' })
+      // Unknown extension ships as octet-stream.
+      expect(await request(port, '/blob.bin')).toMatchObject({
+        status: 200,
+        type: 'application/octet-stream',
+        body: 'BLOB',
+      })
 
-    // `/`, the index path, and any miss all render index.html (SPA routing)
-    // through the registered index taps.
-    const untap = server.tapIndex(html => html.replace('<head>', '<head><script>window.__T__=1</script>'))
-    for (const path of ['/', '/index.html', '/no/such/route']) {
-      const got = await request(port, path)
-      expect(got.status).toBe(200)
-      expect(got.body).toContain('__T__')
-      expect(got.body).toContain('shell')
-    }
-    untap()
-    expect((await request(port, '/')).body).not.toContain('__T__')
+      // `/`, the index path, and any miss all render index.html (SPA routing)
+      // through the registered index taps.
+      const untap = server.tapIndex(html =>
+        html.replace('<head>', '<head><script>window.__T__=1</script>'),
+      )
+      for (const path of ['/', '/index.html', '/no/such/route']) {
+        const got = await request(port, path)
+        expect(got.status).toBe(200)
+        expect(got.body).toContain('__T__')
+        expect(got.body).toContain('shell')
+      }
+      untap()
+      expect((await request(port, '/')).body).not.toContain('__T__')
 
-    // Traversal outside the dist root is 403; non-GET/HEAD is 405.
-    expect((await request(port, '/..%2f..%2fetc%2fpasswd')).status).toBe(403)
-    expect((await request(port, '/nowhere', { method: 'POST' })).status).toBe(405)
+      // The SPA index must never be cached: a desktop-shell restart on a new
+      // origin (random port) or a cleared site would otherwise pin a stale boot
+      // manifest and fail to resume the last session (#309/#150).
+      expect((await request(port, '/')).headers['cache-control']).toBe(
+        'no-cache',
+      )
+      expect(
+        (await request(port, '/no/such/route')).headers['cache-control'],
+      ).toBe('no-cache')
 
-    // HMR safety: disposing the frontend row releases the fallback seat (the
-    // unclaimed webserver answers 404) and the seat is claimable again.
-    const frontendEntry = [...loaded.loader.entries()].find(e => e.options.id === 'frontend')
-    expect(frontendEntry).toBeDefined()
-    await frontendEntry!.fiber?.dispose()
-    expect((await request(port, '/no/such/route')).status).toBe(404)
-    expect(() => server.registerFallback(() => {})).not.toThrow()
-  })
+      // Traversal outside the dist root is 403; non-GET/HEAD is 405.
+      expect((await request(port, '/..%2f..%2fetc%2fpasswd')).status).toBe(403)
+      expect((await request(port, '/nowhere', { method: 'POST' })).status).toBe(
+        405,
+      )
+
+      // HMR safety: disposing the frontend row releases the fallback seat (the
+      // unclaimed webserver answers 404) and the seat is claimable again.
+      const frontendEntry = [...loaded.loader.entries()].find(
+        e => e.options.id === 'frontend',
+      )
+      expect(frontendEntry).toBeDefined()
+      await frontendEntry!.fiber?.dispose()
+      expect((await request(port, '/no/such/route')).status).toBe(404)
+      expect(() => server.registerFallback(() => {})).not.toThrow()
+    },
+  )
 })

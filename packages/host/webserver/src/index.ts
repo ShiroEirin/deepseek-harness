@@ -214,9 +214,25 @@ export class HttpServerService extends Service {
     })
 
     await new Promise<void>((resolve, reject) => {
-      this.server.once('error', reject)
+      // EADDRINUSE means a second instance stepped on a live port; surface
+      // that as an actionable failure instead of the generic boot label
+      // ("plugin tree failed to load") burying the socket error (#321). The
+      // handler is detached on the success path before runtime error logging
+      // takes over.
+      const onListenError = (error: unknown): void => {
+        const code = (error as { code?: string }).code
+        if (code === 'EADDRINUSE') {
+          reject(new Error(
+            `webserver: port ${String(this.config.port)} on ${this.config.host} is already in use — `
+            + 'another dsh web instance is likely running; close it or pick another port',
+          ))
+          return
+        }
+        reject(error)
+      }
+      this.server.once('error', onListenError)
       this.server.listen(this.config.port, this.config.host, () => {
-        this.server.off('error', reject)
+        this.server.off('error', onListenError)
         this.server.on('error', (err) => { this.ctx.logger.error(err) })
         this.listenedPort = (this.server.address() as AddressInfo).port
         resolve()

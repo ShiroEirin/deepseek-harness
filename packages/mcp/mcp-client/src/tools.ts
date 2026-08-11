@@ -53,11 +53,15 @@ const HASH_LENGTH = 12
 /** Raw result record: the bridge owns JSON-value validation after transport. */
 const RawCallToolResultSchema = z.record(z.string(), z.unknown())
 
+/** Max pages drained from one `tools/list` pagination loop before rejecting. */
+const MAX_LIST_PAGES = 100
+
 /** List without mutating the SDK's per-page output-validator cache. */
-function listToolsUncached(client: Client, cursor?: string) {
+function listToolsUncached(client: Client, cursor: string | undefined, timeoutMs: number) {
   return client.request(
     { method: 'tools/list', ...cursor === undefined ? {} : { params: { cursor } } },
     ListToolsResultSchema,
+    { timeout: timeoutMs },
   )
 }
 
@@ -134,8 +138,17 @@ export async function syncTools(
   // Phase 1: fetch and build the next generation without touching the registry.
   const definitions = new Map<string, ToolDefinition>()
   let cursor: string | undefined
+  let pages = 0
   do {
-    const response = await listToolsUncached(client, cursor)
+    // A non-terminating nextCursor (server bug or hostile server) must not
+    // drive an unbounded request storm: cap the pagination loop (issue #446).
+    if (pages >= MAX_LIST_PAGES) {
+      throw new Error(
+        `mcp-client(${opts.serverName}): tools/list pagination exceeded ${MAX_LIST_PAGES} pages — possible non-terminating nextCursor`,
+      )
+    }
+    pages += 1
+    const response = await listToolsUncached(client, cursor, opts.toolCallTimeoutMs)
     for (const tool of response.tools) {
       const publicName = publicToolName(opts.serverName, tool.name)
       if (definitions.has(publicName)) {

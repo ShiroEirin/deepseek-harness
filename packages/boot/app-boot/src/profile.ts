@@ -24,7 +24,7 @@
 
 import { createRequire } from 'node:module'
 import {
-  existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync,
+  existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, unlinkSync, symlinkSync, writeFileSync,
 } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import type { EntryOptions } from '@deepseek-ai/cordis-plugin-loader'
@@ -182,7 +182,10 @@ function ensureSymlink(link: string, target: string): void {
       throw new Error(`dsh: ${link} exists and is not a symlink; remove it so dsh can manage the installation fallback`)
     }
     if (readlinkSync(link) === target) return
-    rmSync(link)
+    // unlink (never follows the symlink) replaces a stale/dangling link on
+    // every Node version; rmSync on a directory-pointing symlink throws
+    // ERR_FS_EISDIR on Node >=24 (upgrade path crash, upstream #406).
+    unlinkSync(link)
   }
   try {
     symlinkSync(target, link, 'junction')

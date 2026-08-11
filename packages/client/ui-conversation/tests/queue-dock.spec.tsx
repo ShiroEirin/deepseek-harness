@@ -227,7 +227,7 @@ describe('QueueDock', () => {
     )
 
     fireEvent.click(getByLabelText('编辑排队消息'))
-    const editor: HTMLInputElement = getByLabelText('编辑排队消息') as HTMLInputElement
+    const editor: HTMLTextAreaElement = getByLabelText('编辑排队消息') as HTMLTextAreaElement
     expect(getByLabelText('保存排队消息')).toBeTruthy()
     expect(getByLabelText('取消编辑')).toBeTruthy()
     expect(queryByLabelText('删除排队消息')).toBeNull()

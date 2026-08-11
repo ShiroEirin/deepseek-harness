@@ -117,6 +117,33 @@ describe('session-query semantic extraction', () => {
     expect(extractSessionEventText(events[6]!)).toBe('in_progress\nship search')
   })
 
+  it('tolerates forged or malformed todo/write entries without throwing (upstream #476)', () => {
+    const valid: SessionEvent<'todo/write'> = {
+      type: 'todo/write', seq: 0, time: 1,
+      data: { todos: [{ status: 'in_progress', content: 'ship search' }] },
+    }
+    // Forged entries: non-record element, missing fields, non-string fields,
+    // and a non-array todos payload — all legal JSON that used to crash
+    // extraction with a bare TypeError (reading 'trim').
+    const malformed: SessionEvent[] = [
+      { type: 'todo/write', seq: 1, time: 2, data: { todos: ['not-an-object-entry'] } } as never,
+      { type: 'todo/write', seq: 2, time: 3, data: { todos: [{}] } } as never,
+      { type: 'todo/write', seq: 3, time: 4, data: { todos: [{ status: 7, content: null }] } } as never,
+      { type: 'todo/write', seq: 4, time: 5, data: { todos: 'not-an-array' } } as never,
+    ]
+    expect(extractSessionEventText(valid)).toBe('in_progress\nship search')
+    for (const event of malformed) {
+      expect(() => extractSessionEventText(event)).not.toThrow()
+      expect(extractSessionEventText(event)).toBe('')
+    }
+    // A malformed entry among valid ones contributes only the valid text.
+    const mixed: SessionEvent[] = [{
+      type: 'todo/write', seq: 5, time: 6,
+      data: { todos: [{ status: 'open', content: 'keep' }, 'junk'] },
+    }] as never
+    expect(extractSessionEventText(mixed[0]!)).toBe('open\nkeep')
+  })
+
   it('extracts meaningful turn outcomes and skips structural or unknown events', () => {
     const reasons: Array<[SessionEvent<'turn/end'>['data']['reason'], string]> = [
       [{ kind: 'error', error: { message: 'boom', code: 'UNKNOWN' } }, 'error\nboom'],

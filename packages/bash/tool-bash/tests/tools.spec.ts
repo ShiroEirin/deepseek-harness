@@ -266,6 +266,15 @@ describe('bash tool', () => {
     expect(text(result)).toBe('(no output)\n[timed out after 100ms]\n[killed by signal: SIGTERM]')
   })
 
+  it('honors the timeout_ms alias exactly like timeoutMs', async () => {
+    // Models emit the snake_case spelling (observed 78x in one session with
+    // zero timeoutMs uses); the alias must reach the executor (#305).
+    const ctx = await setup()
+    const result = await call(ctx, 'bash', { command: 'sleep 60', description: 'test command', timeout_ms: 100 })
+    expect(result.isError).toBe(false)
+    expect(text(result)).toBe('(no output)\n[timed out after 100ms]\n[killed by signal: SIGTERM]')
+  })
+
   it('reports a timeout even when the command traps the signal and exits 0', async () => {
     // The signal-independent timeout marker: a trapped SIGTERM that exits 0
     // after our timer fired must NOT look like a clean success. (bash may
@@ -331,6 +340,7 @@ describe('bash tool', () => {
     [{ command: 'x' }, /missing required property "description"/],
     [{ command: 'x', description: 7 }, /"description" must be a string/],
     [{ command: 'x', description: 'd', timeoutMs: 'soon' }, /"timeoutMs" must be a number/],
+    [{ command: 'x', description: 'd', timeout_ms: 'soon' }, /"timeout_ms" must be a number/],
     [{ command: 'x', description: 'd', workdir: 7 }, /"workdir" must be a string/],
     [{ command: 'x', description: 'd', run_in_background: 'yes' }, /"run_in_background" must be a boolean/],
   ])('rejects schema-invalid args %j', async (args, pattern) => {
@@ -345,6 +355,7 @@ describe('bash tool', () => {
     [{ command: '  ', description: 'd' }, /invalid command/],
     [{ command: 'x', description: '   ' }, /invalid description/],
     [{ command: 'x', description: 'd', timeoutMs: -1 }, /invalid timeoutMs/],
+    [{ command: 'x', description: 'd', timeout_ms: -1 }, /invalid timeout_ms/],
   ])('rejects value-invalid args %j', async (args, pattern) => {
     const ctx = await setup()
     const result = await call(ctx, 'bash', args)
@@ -370,8 +381,9 @@ describe('bash tool', () => {
       type: 'object',
       required: ['command', 'description'],
     })
-    expect(Object.keys(bashSchema.parameters.properties as Record<string, unknown>))
-      .toContain('run_in_background')
+    const propertyKeys = Object.keys(bashSchema.parameters.properties as Record<string, unknown>)
+    expect(propertyKeys).toContain('run_in_background')
+    expect(propertyKeys).toContain('timeout_ms')
     expect(bashSchema.description).toContain('task_output')
   })
 
@@ -552,7 +564,7 @@ describe('background execution through the task runtime', () => {
 
     const schema = ctx.tools.schemas().find(s => s.name === 'bash')!
     expect(Object.keys(schema.parameters.properties as Record<string, unknown>))
-      .toEqual(['command', 'description', 'timeoutMs', 'workdir'])
+      .toEqual(['command', 'description', 'timeoutMs', 'timeout_ms', 'workdir'])
     expect(schema.description).toContain('Background execution is not available')
     expect(schema.description).not.toContain('run_in_background')
     // The registry-held definition agrees (schema and capability never disagree).

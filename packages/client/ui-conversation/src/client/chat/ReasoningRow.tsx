@@ -1,20 +1,12 @@
 /** Assistant reasoning disclosure, independent of Tool-call presentation. */
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { DisclosureRow, IconThinkOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
-import { useThrottledVisualUpdate } from './use-throttled-visual-update.ts'
-import a11yCss from './accessibility.module.css'
 import css from './ReasoningRow.module.css'
 
 function firstLine(text: string): string {
   const newline = text.indexOf('\n')
   return newline === -1 ? text : text.slice(0, newline)
-}
-
-function latestLine(text: string): string {
-  const visible = text.trimEnd()
-  const newline = visible.lastIndexOf('\n')
-  return newline === -1 ? visible : visible.slice(newline + 1)
 }
 
 /**
@@ -26,20 +18,12 @@ function latestLine(text: string): string {
  */
 export function ReasoningRow({ text, running, t }: { text: string; running: boolean; t: ChatViewSlotProps['t'] }) {
   const [expanded, setExpanded] = useState(false)
-  const summaryRef = useRef<HTMLSpanElement>(null)
-  const summary = running ? latestLine(text) : firstLine(text)
-  const scheduleSummaryScroll = useThrottledVisualUpdate(() => {
-    const element = summaryRef.current
-    if (element === null) return
-    element.scrollLeft = running ? element.scrollWidth - element.clientWidth : 0
-  })
-  useEffect(() => {
-    scheduleSummaryScroll()
-  }, [running, scheduleSummaryScroll, summary])
+  // #132: while streaming, the collapsed row shows a stable status label
+  // instead of a reasoning preview, so token updates do not churn it.
+  const summary = running ? t('think.running') : firstLine(text)
 
   return (
     <div className={css.root} data-variant="think" data-state={!running ? 'ok' : 'running'}>
-      {running && <span className={a11yCss.visuallyHidden}>{t('row.running')}</span>}
       <DisclosureRow
         rowClassName={css.row}
         leadingClassName={css.leading}
@@ -54,7 +38,7 @@ export function ReasoningRow({ text, running, t }: { text: string; running: bool
         collapsedContent={(
           <>
             <span className={css.separator} aria-hidden />
-            <span ref={summaryRef} className={css.summary} data-follow-end={running || undefined}>{summary}</span>
+            <span className={css.summary}>{summary}</span>
           </>
         )}
       >

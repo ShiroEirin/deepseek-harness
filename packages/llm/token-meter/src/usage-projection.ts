@@ -79,6 +79,49 @@ const usageOf = (event: SessionEvent): TokenUsage | undefined =>
       ? event.data.usage
       : undefined
 
+/** Whether a value is a safe non-negative integer count. */
+function isNonNegativeInt(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
+}
+
+/**
+ * Input defence for forged/poisoned usage records (upstream #443). A session
+ * log is writable storage, so a negative/string/missing token field must not
+ * propagate into the projection and explode the view's zod validation. An
+ * invalid record is skipped entirely — mirroring `measure()`'s tolerance —
+ * so the read path never crashes and no dirty value enters the cached state.
+ */
+function sanitizeUsage(usage: TokenUsage): TokenUsage | undefined {
+  if (
+    !isNonNegativeInt(usage.inputTokens) ||
+    !isNonNegativeInt(usage.outputTokens)
+  )
+    return undefined
+  if (
+    usage.cacheReadTokens !== undefined &&
+    !isNonNegativeInt(usage.cacheReadTokens)
+  )
+    return undefined
+  if (
+    usage.cacheWriteTokens !== undefined &&
+    !isNonNegativeInt(usage.cacheWriteTokens)
+  )
+    return undefined
+  return usage
+}
+
+/**
+ * Input defence for a forged `request/context` window (upstream #443): the
+ * projection schema demands a positive integer, so a negative/zero/string
+ * value would blow up the view. `undefined` (absent) is legal; anything else
+ * must be a positive safe integer.
+ */
+function sanitizeContextWindow(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0
+    ? value
+    : undefined
+}
+
 /**
  * Context-occupancy state: the two independent last-wins records plus the
  * O(1) running surface total needed to carry the newest sample forward.
@@ -122,7 +165,12 @@ ProjectionDefinition<'tokenUsage', TokenUsageState> = {
       return state
     }
 
-    const buckets = bucketsFrom(usage)
+    // Forged/poisoned usage must not reach the projection (upstream #443):
+    // skip the event so the view's zod validation never sees a bad number.
+    const clean = sanitizeUsage(usage)
+    if (clean === undefined) return state
+
+    const buckets = bucketsFrom(clean)
     const previous = state.last !== null
       && state.last.turn === turn
       && state.last.step === step
@@ -169,21 +217,42 @@ ProjectionDefinition<'contextPressure', ContextPressureState> = {
     const fold = foldSurfaceProjection(state.claim, event)
     let next = state
     if (event.type === 'request/context') {
-      const contextWindow = event.data.contextWindow
-      if (contextWindow !== state.contextWindow) {
-        if (contextWindow !== undefined) {
-          next = { ...next, contextWindow }
-        } else {
+      const rawContextWindow = event.data.contextWindow
+      if (rawContextWindow === undefined) {
+        // A route that advertises no capacity legally clears the window.
+        if (state.contextWindow !== undefined) {
           const { contextWindow: _removed, ...withoutContextWindow } = next
           next = withoutContextWindow
+        }
+      } else {
+        // Forged contextWindow (negative/zero/string) must not reach the
+        // state: only a positive safe integer is accepted, anything invalid
+        // is skipped entirely so the last good window survives (#443).
+        const contextWindow = sanitizeContextWindow(rawContextWindow)
+        if (
+          contextWindow !== undefined &&
+          contextWindow !== state.contextWindow
+        ) {
+          next = { ...next, contextWindow }
         }
       }
     }
     const usage = usageOf(event)
     if (usage !== undefined) {
-      const pressureTokens = pressureFrom(usage)
-      if (pressureTokens !== next.pressureTokens || next.sampledSurfaceTokens !== next.surfaceTokens) {
-        next = { ...next, pressureTokens, sampledSurfaceTokens: next.surfaceTokens }
+      // Forged/poisoned usage must not reach the pressure fold (upstream #443).
+      const clean = sanitizeUsage(usage)
+      if (clean !== undefined) {
+        const pressureTokens = pressureFrom(clean)
+        if (
+          pressureTokens !== next.pressureTokens ||
+          next.sampledSurfaceTokens !== next.surfaceTokens
+        ) {
+          next = {
+            ...next,
+            pressureTokens,
+            sampledSurfaceTokens: next.surfaceTokens,
+          }
+        }
       }
     }
     if (fold.deltaTokens !== 0) {

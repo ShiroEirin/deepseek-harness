@@ -46,6 +46,8 @@ interface BashToolArgs {
   command: string
   description: string
   timeoutMs?: number
+  /** @deprecated snake_case alias; models emit timeout_ms. Prefer timeoutMs. */
+  timeout_ms?: number
   workdir?: string
   run_in_background?: boolean
   sandbox_permissions?: string
@@ -61,6 +63,9 @@ function validateBashArgs(args: BashToolArgs): void {
   }
   if (args.timeoutMs !== undefined && (!Number.isFinite(args.timeoutMs) || args.timeoutMs <= 0)) {
     throw new Error(`invalid timeoutMs: expected a positive number, got ${JSON.stringify(args.timeoutMs)}`)
+  }
+  if (args.timeout_ms !== undefined && (!Number.isFinite(args.timeout_ms) || args.timeout_ms <= 0)) {
+    throw new Error(`invalid timeout_ms: expected a positive number, got ${JSON.stringify(args.timeout_ms)}`)
   }
   // The escalation pairing (sandbox_permissions ⇔ justification, non-empty) is
   // the shared rule both enforcing families validate identically.
@@ -252,6 +257,7 @@ export function apply(ctx: Context, config: Config = {}): void {
           + '"git status" → "Show working tree status"; "npm install" → "Install package dependencies".',
       },
       timeoutMs: { type: 'number', description: 'Timeout in milliseconds. The executor applies its configured default and cap, and kills the command on expiry.' },
+      timeout_ms: { type: 'number', description: 'Timeout in milliseconds (snake_case alias of timeoutMs; the executor applies its configured default and cap).' },
       workdir: { type: 'string', description: 'Working directory for this command. Defaults to the session workspace; a relative path is resolved against it.' },
       ...backgroundEnabled ? {
         run_in_background: { type: 'boolean' as const, description: 'Run in the background and return a task id immediately (collect with task_output, stop with task_kill). No timeout applies.' },
@@ -329,6 +335,8 @@ export function apply(ctx: Context, config: Config = {}): void {
     },
     async execute(args: BashToolArgs, exec) {
       validateBashArgs(args)
+      // Models emit the snake_case alias; timeout_ms wins when both are present.
+      const effectiveTimeoutMs = args.timeout_ms ?? args.timeoutMs
       // Description is display metadata; workdir defaults to the caller's session.
       const standingPolicy = resolveSandboxPolicy(exec)
       const approvedMode = args.sandbox_permissions !== undefined && args.justification !== undefined
@@ -342,7 +350,7 @@ export function apply(ctx: Context, config: Config = {}): void {
       const request = {
         command: args.command,
         ...workdir !== undefined ? { workdir } : {},
-        ...args.timeoutMs !== undefined ? { timeoutMs: args.timeoutMs } : {},
+        ...effectiveTimeoutMs !== undefined ? { timeoutMs: effectiveTimeoutMs } : {},
         dshEnv,
         ...policy !== undefined ? { sandboxPolicy: policy } : {},
       }

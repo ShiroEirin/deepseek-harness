@@ -140,6 +140,7 @@ describe('settleRunResult', () => {
       onAbort,
     })
     expect(result.stopReason).toBe('error')
+    expect(result.error).toBe('transport died')
     expect(seen).toEqual(['error:transport died'])
   })
 
@@ -153,6 +154,7 @@ describe('settleRunResult', () => {
       onAbort,
     })
     expect(result.stopReason).toBe('error')
+    expect(result.error).toBe('no sink configured')
   })
 })
 

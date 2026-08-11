@@ -125,7 +125,11 @@ export interface SkillViewOptions extends SkillLookupOptions {
  * @returns whether the policy permits model invocation.
  */
 export function isModelInvocable(skill: Pick<SkillSummary, 'invocation'>): boolean {
-  return skill.invocation.modelInvocable
+  // Defensive: a provider candidate that slipped past validation (or a summary
+  // built before validation) must not throw at every agent pre-step.
+  // The `unknown` hop records that runtime shape may violate the type contract.
+  const invocation: unknown = skill.invocation
+  return (invocation as SkillInvocationPolicy | undefined)?.modelInvocable ?? false
 }
 
 /**
@@ -134,7 +138,11 @@ export function isModelInvocable(skill: Pick<SkillSummary, 'invocation'>): boole
  * @returns whether the policy permits user invocation.
  */
 export function isUserInvocable(skill: Pick<SkillSummary, 'invocation'>): boolean {
-  return skill.invocation.userInvocable
+  // Defensive: a provider candidate that slipped past validation (or a summary
+  // built before validation) must not throw at every agent pre-step.
+  // The `unknown` hop records that runtime shape may violate the type contract.
+  const invocation: unknown = skill.invocation
+  return (invocation as SkillInvocationPolicy | undefined)?.userInvocable ?? false
 }
 
 /**
@@ -718,7 +726,14 @@ function validateCandidate(candidate: SkillCandidate, providerName: string): voi
   if (candidate.description.length === 0) {
     throw new Error(`skill provider "${providerName}" returned skill "${candidate.name}" without a description`)
   }
-  validateInvocation(candidate.invocation, `skill provider "${providerName}" returned skill "${candidate.name}"`)
+  // The `unknown` hop records that provider candidates may violate the type
+  // contract (SkillCandidate.invocation is declared required but a hostile or
+  // buggy provider can omit it); reject instead of crashing later.
+  const invocation: unknown = candidate.invocation
+  if (invocation === undefined) {
+    throw new TypeError(`skill provider "${providerName}" returned skill "${candidate.name}" without an invocation policy (SkillCandidate.invocation is required)`)
+  }
+  validateInvocation(invocation, `skill provider "${providerName}" returned skill "${candidate.name}"`)
   if (candidate.whenToUse !== undefined && typeof candidate.whenToUse !== 'string') {
     throw new TypeError(`skill provider "${providerName}" returned skill "${candidate.name}" with a non-string whenToUse`)
   }

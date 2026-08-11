@@ -441,7 +441,7 @@ describe('malformed replay and listener lifecycle', () => {
     expect(() => service.measure(session)).toThrow(pattern)
   }
 
-  it('rejects an assistant without its step boundary transactionally', () => {
+  it('tolerates an assistant without its step boundary and reports degraded replay', () => {
     const session = Session.create(SessionId('bad-step'))
     appendHeader(session, header('deepseek-v4-flash'))
     session.append('assistant/message', {
@@ -456,18 +456,17 @@ describe('malformed replay and listener lifecycle', () => {
         },
       }),
     }, { surfaceOp: 'append', sourceEventSeqs: [] })
-    expectRepeatedFailure(meter(), session, /no matching step\/start/)
+    const measurement = meter().measure(session)
+    expect(measurement.degraded).toMatchObject({ kind: 'assistant/message' })
+    expect(measurement.surfaceTokens).toBeGreaterThan(0)
   })
 
-  it('clears completed step boundaries and rejects overlapping or late step events', () => {
+  it('clears completed step boundaries and tolerates overlapping or late step events', () => {
     const overlapping = Session.create(SessionId('overlapping-step'))
     overlapping.append('step/start', { turn: 1, step: 1 })
     overlapping.append('step/start', { turn: 1, step: 2 })
-    expectRepeatedFailure(
-      meter(),
-      overlapping,
-      /arrived before turn 1\/step 1 ended/,
-    )
+    const overlap = meter().measure(overlapping)
+    expect(overlap.degraded).toMatchObject({ kind: 'step/start' })
 
     const late = Session.create(SessionId('late-assistant'))
     late.append('step/start', { turn: 1, step: 1 })
@@ -485,27 +484,20 @@ describe('malformed replay and listener lifecycle', () => {
         },
       }),
     }, { surfaceOp: 'append', sourceEventSeqs: [] })
-    expectRepeatedFailure(
-      meter(),
-      late,
-      /no matching step\/start/,
-    )
+    const lateMeasurement = meter().measure(late)
+    expect(lateMeasurement.degraded).toMatchObject({ kind: 'assistant/message' })
 
     const mismatchedEnd = Session.create(SessionId('mismatched-end'))
     mismatchedEnd.append('step/start', { turn: 1, step: 1 })
     mismatchedEnd.append('step/end', { turn: 1, step: 2 })
-    expectRepeatedFailure(
-      meter(),
-      mismatchedEnd,
-      /step\/end .* no matching step\/start/,
-    )
+    const endMeasurement = meter().measure(mismatchedEnd)
+    expect(endMeasurement.degraded).toMatchObject({ kind: 'step/end' })
   })
 
-  it('rejects invalid assistant source-event references', () => {
+  it('tolerates invalid assistant provenance with a degraded anchor', () => {
     const cases: Array<{
       name: string
       appendSource(session: Session): number[]
-      pattern: RegExp
     }> = [
       {
         name: 'non-chunk',
@@ -515,7 +507,6 @@ describe('malformed replay and listener lifecycle', () => {
             source: { kind: 'user' },
           }), { surfaceOp: 'append' }).seq]
         },
-        pattern: /is not assistant\/chunk/,
       },
       {
         name: 'wrong-step',
@@ -526,7 +517,6 @@ describe('malformed replay and listener lifecycle', () => {
             chunk: { type: 'finish', reason: { kind: 'stop' } },
           }).seq]
         },
-        pattern: /belongs to another step/,
       },
     ]
     for (const testCase of cases) {
@@ -547,11 +537,12 @@ describe('malformed replay and listener lifecycle', () => {
         }),
         usage: { inputTokens: 1, outputTokens: 1 },
       }, { surfaceOp: 'append', sourceEventSeqs })
-      expect(() => meter().measure(session)).toThrow(testCase.pattern)
+      const measurement = meter().measure(session)
+      expect(measurement.degraded).toMatchObject({ kind: 'provenance' })
     }
   })
 
-  it('rejects repeated and non-earlier assistant source-event references', () => {
+  it('tolerates repeated and non-earlier assistant provenance', () => {
     const duplicate = Session.create(SessionId('duplicate-source'))
     duplicate.append('step/start', { turn: 1, step: 1 })
     appendHeader(duplicate, header('deepseek-v4-flash'))
@@ -580,7 +571,8 @@ describe('malformed replay and listener lifecycle', () => {
       surfaceOp: 'append',
       sourceEventSeqs: [source, source],
     })
-    expect(() => meter().measure(duplicate)).toThrow(/repeats source seq/)
+    const duplicateMeasurement = meter().measure(duplicate)
+    expect(duplicateMeasurement.degraded).toMatchObject({ kind: 'provenance' })
 
     const future = Session.create(SessionId('future-source'))
     future.append('step/start', { turn: 1, step: 1 })
@@ -605,10 +597,11 @@ describe('malformed replay and listener lifecycle', () => {
       surfaceOp: 'append',
       sourceEventSeqs: [99],
     })
-    expect(() => meter().measure(future)).toThrow(/is not earlier/)
+    const futureMeasurement = meter().measure(future)
+    expect(futureMeasurement.degraded).toMatchObject({ kind: 'provenance' })
   })
 
-  it('does not partially apply a malformed assistant replacement', () => {
+  it('folds a malformed assistant replacement with a degraded marker', () => {
     const session = Session.create(SessionId('transactional-replace'))
     session.append('user/message', createUserMessage({
       content: [{ type: 'text', text: 'head' }],
@@ -628,11 +621,9 @@ describe('malformed replay and listener lifecycle', () => {
         },
       }),
     }, { surfaceOp: { op: 'replace', start: head, end: head }, sourceEventSeqs: [head] })
-    expectRepeatedFailure(
-      meter(),
-      session,
-      /no matching step\/start/,
-    )
+    const measurement = meter().measure(session)
+    expect(measurement.degraded).toMatchObject({ kind: 'assistant/message' })
+    expect(measurement.nodes.some(node => node.seq === head)).toBe(false)
   })
 
   it('rejects corrupt replacement ranges without advancing the replay cursor', () => {

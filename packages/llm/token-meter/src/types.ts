@@ -11,6 +11,12 @@ export type { ContextBreakdownProjection, ContextPressureProjection, TokenUsageP
 /** Token-meter plugin configuration; the fixed estimator has no settings. */
 export type TokenMeterConfig = Record<string, never>
 
+/**
+ * Boundary/provenance fault kinds that are tolerated in degraded replay on a
+ * torn session instead of failing the whole measurement (upstream issue #88).
+ */
+export type ReplayDegradeKind = 'step/start' | 'step/end' | 'assistant/message' | 'provenance'
+
 /** The baseline from which a signed surface delta produces current pressure. */
 export type TokenMeasurementBaseline =
   | { readonly kind: 'none'; readonly tokens: 0 }
@@ -31,6 +37,11 @@ export interface TokenMeasurement {
   readonly surfaceTokens: number
   /** Current surface nodes in positional head-to-tail order. */
   readonly nodes: readonly TokenSurfaceNode[]
+  /**
+   * First tolerated boundary/provenance fault on a torn session;
+   * undefined while the replay is fully healthy.
+   */
+  readonly degraded: { readonly seq: number; readonly kind: ReplayDegradeKind } | undefined
 }
 
 /** One token-priced node in the current ordered session surface. */

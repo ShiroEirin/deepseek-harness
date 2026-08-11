@@ -631,6 +631,28 @@ describe('/plan', () => {
     expect(ctx.planMode.get(active)).toEqual({ active: false })
   })
 
+  it('treats near-synonym exit words (off!, off now, OFF) as leaving, not re-entering (upstream #447)', async () => {
+    const ctx = await setup()
+    await ctx.plugin(CommandService)
+    await new Promise(resolve => setImmediate(resolve))
+    const signal = new AbortController().signal
+
+    for (const word of ['off!', 'off now', 'OFF', 'off, please', 'off.']) {
+      const safeId = word.replace(/[^a-z]/gi, '')
+      const agent = await agentWithSession(ctx, 'near-synonym-' + safeId, { active: true })
+      openTurn(agent.session)
+      const steer = vi.fn()
+      ;(agent as unknown as { steer: typeof steer }).steer = steer
+      const result = await ctx.commands.execute(agent, '/plan ' + word, signal)
+      expect(result?.result.kind).toBe('success')
+      expect(ctx.planMode.get(agent)).toEqual({ active: true, pending: false })
+      // A leave intent must never steer the exit text into the model stream.
+      expect(steer).not.toHaveBeenCalled()
+      await boundary(ctx, agent, 'step-start')
+      expect(ctx.planMode.get(agent)).toEqual({ active: false })
+    }
+  })
+
   it('idle sessions get the immediate-commit copy on both /plan and /plan off', async () => {
     const ctx = await setup()
     await ctx.plugin(CommandService)

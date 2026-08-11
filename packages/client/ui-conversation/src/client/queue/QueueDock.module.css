@@ -140,13 +140,20 @@
 
 .editor {
   box-sizing: border-box;
-  height: 28px;
-  padding: 0 8px;
+  /* Multi-line edit surface (upstream #479): grow up to a cap, then scroll. */
+  min-height: 28px;
+  max-height: 120px;
+  padding: 4px 8px;
   border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 6px;
   outline: none;
   background: var(--dsw-alias-bg-base);
   color: var(--dsw-alias-label-primary);
+  font: inherit;
+  line-height: 20px;
+  resize: none;
+  overflow-y: auto;
+  vertical-align: middle;
 }
 
 .editor:focus {

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { redactSecrets, settingsNamespace } from '../src/index.ts'
@@ -21,10 +21,14 @@ const Adapter: z<object> = z.object({
 
 describe('redactSecrets', () => {
   it('strips secrets from object, dict, and array containers and records each position', () => {
-    const { value, secrets } = redactSecrets(Adapter as z<never>, {
+    const { value, secrets, unreachable } = redactSecrets(Adapter as z<never>, {
       apiKey: 'top-secret',
       providers: {
-        openai: { apiKey: 'sk-live', apiKeyEnv: 'OPENAI_API_KEY', baseURL: 'https://x' },
+        openai: {
+          apiKey: 'sk-live',
+          apiKeyEnv: 'OPENAI_API_KEY',
+          baseURL: 'https://x',
+        },
         anthropic: { apiKeyEnv: 'ANTHROPIC_API_KEY' },
       },
       fallbacks: [{ apiKey: 'fb', baseURL: 'https://y' }],
@@ -45,15 +49,20 @@ describe('redactSecrets', () => {
       { path: ['fallbacks', '0', 'apiKey'], set: true },
       { path: ['nested', 'token'], set: false },
     ])
+    expect(unreachable).toEqual([])
   })
 
   it('enumerates unset object-property slots without inventing containers', () => {
-    const { value, secrets } = redactSecrets(Adapter as z<never>, undefined)
+    const { value, secrets, unreachable } = redactSecrets(
+      Adapter as z<never>,
+      undefined,
+    )
     expect(value).toBeUndefined()
     expect(secrets).toEqual([
       { path: ['apiKey'], set: false },
       { path: ['nested', 'token'], set: false },
     ])
+    expect(unreachable).toEqual([])
   })
 
   it('never mutates the input and preserves keys outside the schema', () => {
@@ -61,45 +70,122 @@ describe('redactSecrets', () => {
       apiKey: 'frozen',
       extra: Object.freeze({ keep: true }),
     })
-    const { value } = redactSecrets(Adapter as z<never>, input)
+    const { value, unreachable } = redactSecrets(Adapter as z<never>, input)
     expect(input.apiKey).toBe('frozen')
-    expect(value).toEqual({ extra: { keep: true }, nested: undefined } as never)
+    expect(value).toEqual({
+      extra: { keep: true },
+      nested: undefined,
+    } as never)
     expect((value as { extra: unknown }).extra).toEqual({ keep: true })
+    expect(unreachable).toEqual([])
   })
 
   it('passes malformed container values through untouched', () => {
-    const { value, secrets } = redactSecrets(Adapter as z<never>, {
+    const { value, secrets, unreachable } = redactSecrets(Adapter as z<never>, {
       providers: 'not-a-dict',
       fallbacks: 'not-an-array',
     })
-    expect(value).toEqual({ providers: 'not-a-dict', fallbacks: 'not-an-array' })
+    expect(value).toEqual({
+      providers: 'not-a-dict',
+      fallbacks: 'not-an-array',
+    })
     expect(secrets).toEqual([
       { path: ['apiKey'], set: false },
       { path: ['nested', 'token'], set: false },
     ])
+    expect(unreachable).toEqual([])
   })
 
   it('treats a secret-role container as one opaque secret leaf', () => {
-    const Weird = z.object({ blob: z.object({ inner: z.string() }).role('secret') })
-    const { value, secrets } = redactSecrets(Weird as z<never>, { blob: { inner: 'x' } })
+    const Weird = z.object({
+      blob: z.object({ inner: z.string() }).role('secret'),
+    })
+    const { value, secrets, unreachable } = redactSecrets(Weird as z<never>, {
+      blob: { inner: 'x' },
+    })
     expect(value).toEqual({})
     expect(secrets).toEqual([{ path: ['blob'], set: true }])
+    expect(unreachable).toEqual([])
   })
 
   it('drops a dict entry whose entire value is the secret', () => {
     const Tokens = z.object({ tokens: z.dict(z.string().role('secret')) })
-    const { value, secrets } = redactSecrets(Tokens as z<never>, { tokens: { a: 'x', b: 'y' } })
+    const { value, secrets, unreachable } = redactSecrets(Tokens as z<never>, {
+      tokens: { a: 'x', b: 'y' },
+    })
     expect(value).toEqual({ tokens: {} })
     expect(secrets).toEqual([
       { path: ['tokens', 'a'], set: true },
       { path: ['tokens', 'b'], set: true },
     ])
+    expect(unreachable).toEqual([])
   })
 
   it('tolerates structural nodes missing their relation maps', () => {
-    expect(redactSecrets({ type: 'dict' } as never, { k: 'v' })).toEqual({ value: { k: 'v' }, secrets: [] })
-    expect(redactSecrets({ type: 'object' } as never, { k: 'v' })).toEqual({ value: { k: 'v' }, secrets: [] })
-    expect(redactSecrets({ type: 'array' } as never, ['v'])).toEqual({ value: ['v'], secrets: [] })
+    expect(redactSecrets({ type: 'dict' } as never, { k: 'v' })).toEqual({
+      value: { k: 'v' },
+      secrets: [],
+      unreachable: [],
+    })
+    expect(redactSecrets({ type: 'object' } as never, { k: 'v' })).toEqual({
+      value: { k: 'v' },
+      secrets: [],
+      unreachable: [],
+    })
+    expect(redactSecrets({ type: 'array' } as never, ['v'])).toEqual({
+      value: ['v'],
+      secrets: [],
+      unreachable: [],
+    })
+  })
+
+  it('records a secret reachable only through an unwalkable schema node as unreachable (fail-closed)', () => {
+    // A secret declared behind a union is NOT structurally reachable: the
+    // walker must record it loudly instead of silently shipping it verbatim
+    // (upstream #410).
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      const Union = z.object({
+        credentials: z.union([
+          z.object({ apiKey: z.string().role('secret') }),
+          z.string(),
+        ]),
+      })
+      const { value, secrets, unreachable } = redactSecrets(Union as z<never>, {
+        credentials: { apiKey: 'sk-leak' },
+      })
+      // The value still crosses verbatim (the walker cannot prove safety), but
+      // the position is recorded and warned about — no silent leak.
+      expect(value).toEqual({ credentials: { apiKey: 'sk-leak' } })
+      expect(secrets).toEqual([])
+      expect(unreachable).toEqual([{ path: ['credentials'], type: 'union' }])
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('cannot structurally walk schema node "union"'),
+      )
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
+  it('passes a union whose members declare no secret (preset/effort/retry selectors)', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      const Plain = z.object({
+        retryPolicy: z.union([
+          z.object({ maxRetries: z.number() }),
+          z.string(),
+        ]),
+      })
+      const { value, secrets, unreachable } = redactSecrets(Plain as z<never>, {
+        retryPolicy: { maxRetries: 3 },
+      })
+      expect(value).toEqual({ retryPolicy: { maxRetries: 3 } })
+      expect(secrets).toEqual([])
+      expect(unreachable).toEqual([])
+      expect(warn).not.toHaveBeenCalled()
+    } finally {
+      warn.mockRestore()
+    }
   })
 })
 
@@ -120,9 +206,14 @@ describe('describe() layers and redaction', () => {
     expect(descriptor?.base).toEqual(base)
     expect(descriptor?.base).not.toBe(base)
     expect(descriptor?.user).toEqual({ baseURL: 'https://user' })
-    expect(descriptor?.value).toEqual({ apiKey: 'entry-key', baseURL: 'https://user' })
-    ;(descriptor?.user as Record<string, unknown>).baseURL = 'mutated'
-    expect(ctx.settings.describe()[0]?.user).toEqual({ baseURL: 'https://user' })
+    expect(descriptor?.value).toEqual({
+      apiKey: 'entry-key',
+      baseURL: 'https://user',
+    });
+    (descriptor?.user as Record<string, unknown>).baseURL = 'mutated'
+    expect(ctx.settings.describe()[0]?.user).toEqual({
+      baseURL: 'https://user',
+    })
     expect(descriptor?.secrets).toBeUndefined()
   })
 
@@ -155,7 +246,9 @@ describe('describe() layers and redaction', () => {
   })
 
   it('redacts every layer and enumerates secret slots under redactSecrets', async () => {
-    const ctx = await boot({ adapter: { apiKey: 'user-key', baseURL: 'https://user' } })
+    const ctx = await boot({
+      adapter: { apiKey: 'user-key', baseURL: 'https://user' },
+    })
     ctx.settings.register(NS, Profile, { base: { apiKey: 'entry-key' } })
     const [descriptor] = ctx.settings.describe({ redactSecrets: true })
     expect(descriptor?.value).toEqual({ baseURL: 'https://user' })
@@ -163,6 +256,9 @@ describe('describe() layers and redaction', () => {
     expect(descriptor?.user).toEqual({ baseURL: 'https://user' })
     expect(descriptor?.secrets).toEqual([{ path: ['apiKey'], set: true }])
     const [verbatim] = ctx.settings.describe()
-    expect(verbatim?.value).toEqual({ apiKey: 'user-key', baseURL: 'https://user' })
+    expect(verbatim?.value).toEqual({
+      apiKey: 'user-key',
+      baseURL: 'https://user',
+    })
   })
 })
