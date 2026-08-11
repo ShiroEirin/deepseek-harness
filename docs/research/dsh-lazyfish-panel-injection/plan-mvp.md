@@ -23,36 +23,39 @@ status: approved-for-build
 | 0.6 | 播放失败无降级 | song_url 空/VIP/403 分支无处理 | Error Boundary + 诊断条 + 换歌引导（照反例 `SidebarBoundary` + `fail()`） |
 | 0.7 | `/api/music/*` 无鉴权自证 | serveStatic 无 policy，httpServer 无内置鉴权，但反例用 `isTrustedApiRequest`（Host-loopback/trusted + sec-fetch-site + origin）做 fence，明言「非 auth 层」 | 照反例 **`isTrustedApiRequest` Host-header fence**（需 `inject:['loader']` 读 `trustedHostsOf`），不自造 token |
 
-## 1. 形态选型（registry + client 半边）
+## 1. 形态选型（dual-form + `@dsh-external` junction 装配）
 
-参照：`dsh-better-sidebar`（`~/.dsh/plugins/dsh-better-sidebar/`，registry 完整反例）。
+> **实际装配通道（2026-08-11 实装验证）**：当前 harness（dsh 0.0.1）**没有 `dsh registry` 命令、其源码也无 `registerExternal`/`dsh.plugin.json` 加载逻辑**。插件实际经 `~/.dsh/cordis.patch.yml`（机器级装配清单）+ `web/node_modules/@dsh-external` junction 装载，与 `dsh-latex`/`dsh-auto-blame`（dual-form）一致。因此「registry 脚手架 + `dsh.plugin.json`」形态不适用，改用 dual-form 包 + junction。
 
-- 插件 id：`publisher/name`（如 `dsh-external/dsh-music-player`），目录名 = name。
-- 脚手架：`dsh registry create <publisher>/<name>`，生成 `dsh.plugin.json` + `index.mjs` + `README.md`（skill 脚手架入口；实际反例是 tsdown 构建型，见 §6）。
-- 文件树（照反例，host 与 client 指向 `lib/` 编译产物）：
+形态参照：`dsh-external/dsh-latex` / `dsh-auto-blame`（dual-form：server half 经 scoped 包名解析，client half 经 `exports["./client"]` 被 web client-modules 自动发现）。
+
+- 插件 id / 包名：`@dsh-external/dsh-music-player`（ModuleLoader id 与 package `name` 一致）。
+- 目录：`~/.dsh/plugins/dsh-music-player/`（与反例同层；junction 到 `web/node_modules/@dsh-external/dsh-music-player`）。
+- 文件树（实际建成，host 与 client 指向 `lib/` 编译产物）：
   ```
   dsh-music-player/
-    dsh.plugin.json          # id/version/main/engines.dsh/contributes + client.main
-    src/                     # TS 源码（host half index.ts + client half client.tsx）
-      index.ts
-      client.tsx
-      index.css
-    lib/                     # 构建产物（main / client.main 指向这里）
-      index.js
-      client.js
-    tsconfig.json|tsdown.config.ts|package.json|README.md
+    package.json             # name/main/exports["./client"]/dsh.client 声明
+    src/                     # TS 源码（server half index.ts + client half client/*）
+      index.ts               #  host：/api/music/v1 路由 + defineTool
+      netease.ts|crypto.ts   #  网易云逆向（weapi/eapi/明文 api，零第三方依赖）
+      trust-fence.ts|wire.ts #  Host-fence + JSON wire
+      context-types.ts
+      client/index.tsx       #  document.body 自挂面板入口
+      client/Player.tsx|api.ts|lyrics.ts|analyzer.ts
+    lib/                     # 构建产物（main → lib/index.js；client → lib/client.js）
+    tsconfig.json|tsconfig.build.json|tsdown.config.mjs|scripts/build.mjs
   ```
-- `dsh.plugin.json` 结构（照反例 `dsh.plugin.json`，`main`/`client.main` 指向 `lib/` 产物）：
+- `package.json` 关键字段（对照 `dsh-web-ui-notify`）：
   ```json
   {
-    "id": "dsh-external/dsh-music-player",
-    "version": "0.1.0",
+    "name": "@dsh-external/dsh-music-player",
+    "type": "module",
     "main": "./lib/index.js",
-    "description": "...",
-    "engines": { "dsh": ">=0.0.1" },
-    "contributes": { "tools": ["music_search","music_play","music_queue"], "skills": [] },
-    "client": { "main": "./lib/client.js" }
+    "exports": { ".": "./lib/index.js", "./client": "./lib/client.js" },
+    "dsh": { "client": { "platform": "web" } }
   }
+  ```
+  注：无需 `dsh.plugin.json`——装配靠 junction + `cordis.patch.yml` 一行 scoped 包名即可（server 与 client 由 web 一并发现）。
   ```
 - **contributes.tools 仅是 registry 展示清单，不是生效通道**：工具真正生效只来自 §2 的 `ctx.tools.register`。两份名单必须逐字一致（enable 校验：声明未注册或注册未声明都会失败回滚），后续加工具需同步两处。
 
@@ -138,16 +141,16 @@ agent 通过对 model 说「来点轻快的歌」→ 调 `music_search` → `mus
 - Cookie（`NETEASE_COOKIE`）经可选 settings 子注入传入，仅存 host 端，不下发到浏览器。
 - 不要把可播放 URL 无保护地暴露给非站点进程（fence 兜底，外加 Cookie 不出 host）。
 
-## 6. 构建与验证（registry 口径）
+## 6. 构建与装配验证（dual-form junction 口径）
 
-> 注意与 dsh-plugin-dev 的 bundle 验证流程区分：registry 插件**不**进 dump-config。
-> 反例为 tsdown 构建型 registry 插件（`src/` TS → `lib/` 产物），验证落在「构建产物 + web 装配」两层。
+> 当前 harness 无线上的 `dsh registry` 命令，装配不经过 Loader tree / dump-config。实际采用「junction + cordis.patch」通道（见 §1）。
 
-- 构建：按反例 `tsconfig.json` + `tsdown.config.ts` 从 `src/` 产出 `lib/`（`main`/`client.main` 指向 `lib/` 产物）。客户端 bundle 的 `__ModuleLoader__.load` id 必须 = 插件 id。
-- 安装/启用：`dsh registry install ./dsh-music-player` → `dsh registry enable dsh-external/dsh-music-player` → `dsh registry list`。
-- Node half 挂载验证：**web 侧**确认——`dsh registry list` 显示 enabled + 重启 web 后 boot log 无 `plugin tree failed to load`。不依赖 `dsh run`（它 boots headless profile，无 HTTP/browser 层，registry Node half 在 headless 是否装配未证实）。
-- client 半边挂载验证：headless Chrome `--headless=new --virtual-time-budget=12000 --dump-dom <dsh web url>`，断言 `data-dsh-music-player` marker 存在且无 "Failed to load plugins"。反例对应的浏览器 smoke 在其 `tests/smoke.spec.ts`；`verify-client-smoke.mjs` 属 dsh-pet 项目（plugin-registry-create skill 引用的），不是本反例——实现时参考 dsh-pet 该脚本但标注来源。
-- host 工具验证：web 装配后，向 agent 下「用 music_search 搜 Star Sky」指令，确认返回结果；或直接 `curl -X POST`（带 Host fence 允许的来源）打 `/api/music/v1` 验证路由。
+- 构建：`node scripts/build.mjs` —— tsc（`tsconfig.build.json`）产 node half `lib/*.js`，tsdown（`tsdown.config.mjs`）产 client half `lib/client.js`（自建 ModuleLoader closure factory）。产物验：`lib/` 无非 `.d.ts` 的 `.ts` 残留、`lib/index.js` 内无 `.ts` 相对导入。
+  依赖解析：插件 `node_modules` 为 junction → `~/.dsh/source/current/node_modules`（运行时 harness），`react`/`@types/react`/`@types/react-dom` 从 pnpm store 手动 junction（pnpm 不 hoist 到 root）。零 `npm install`。
+- 装配：① `~/.dsh/profiles/web/node_modules/@dsh-external/dsh-music-player` → junction 到插件目录；② `~/.dsh/cordis.patch.yml` 加 `- insert: { id: dsh-music-player, name: "@dsh-external/dsh-music-player" }`；③ `~/.dsh/client-links.manifest` 记一行 `web|@dsh-external/dsh-music-player|[plugins]...`（可重建性）。改装配前备份 `cordis.patch.yml` + `client-links.manifest`。
+- server half 验证：启动 `dsh web`（`start-dsh-web.ps1`，tsx + bin.ts web，监听 3080）后 `POST /api/music/v1`（search/song_url/lyric）应 200 且回真实数据；boot log 无 `plugin tree failed to load`。
+- client half 验证：`GET /plugins/@dsh-external/dsh-music-player/client.js` 200 且含 `__ModuleLoader__.load({id:"dsh-music-player"})`；再 CDP headless（`scripts/smoke-web.mjs`）打开页面，断言 `[data-dsh-music-player]` marker 存在、面板文本含「网易云」、无 "Failed to load plugins"。
+- Host 工具验证：web 装配后向 agent 下「用 music_search 搜 Star Sky」指令确认返回；HTTP 侧 `curl -X POST` 打 `/api/music/v1`（Host fence 允许来源）验证路由。
 
 ## 7. 依赖与风险
 
@@ -157,7 +160,7 @@ agent 通过对 model 说「来点轻快的歌」→ 调 `music_search` → `mus
 | 逆向接口风控/403 | 中 | 播放 URL 为空的降级：提示换歌、切 level、必要时提示登录 |
 | 版权/VIP 曲目无法播放 | 中 | 面板对空 URL 优雅降级，引导搜可听版本 |
 | `#root margin-right` 推挤与反例 rule 竞争 | 低 | 若同时启用 dsh-better-sidebar 且都用 `#root { margin-right }`，两规则按 CSS 层叠互相覆盖（与变量名无关）。缓解：我方优先用右下角浮层（不推挤），或在自身 CSS 用更高优先级/`!important` 明确声明 |
-| registry/bundle 双通道互斥 | 中 | 只走 registry，不经 Loader tree（反例即此） |
+| 装配依赖 `~/.dsh` 部署结构（junction + cordis.patch） | 中 | 换机器需按 `client-links.manifest` 重建 junction；`cordis.patch.yml` 的 scoped 包名解析依赖 junction 存在。改动前先备份装配文件 |
 
 ## 8. 未纳入 MVP（后续）
 
