@@ -1,0 +1,75 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib/types"
+  },
+  "include": [
+    "src"
+  ],
+  "references": [
+    {
+      "path": "../../vendor/cordis"
+    },
+    {
+      "path": "../../vendor/loader"
+    },
+    {
+      "path": "../../vendor/include"
+    },
+    {
+      "path": "../../packages/boot/app-boot"
+    },
+    {
+      "path": "../../packages/boot/cmdline"
+    },
+    {
+      "path": "../../packages/bundle/base"
+    },
+    {
+      "path": "../../packages/bundle/headless"
+    },
+    {
+      "path": "../../packages/bundle/web-app"
+    },
+    {
+      "path": "../../packages/host/apiproxy"
+    },
+    {
+      "path": "../../packages/host/webserver"
+    },
+    {
+      "path": "../../packages/host/frontend-static"
+    },
+    {
+      "path": "../../packages/core/session"
+    },
+    {
+      "path": "../../packages/core/system-prompt"
+    },
+    {
+      "path": "../../packages/core/tools"
+    },
+    {
+      "path": "../../packages/util/environment"
+    },
+    {
+      "path": "../../packages/util/paths"
+    },
+    {
+      "path": "../../packages/mcp/mcp-client"
+    },
+    {
+      "path": "../../packages/support/loader-smoke"
+    },
+    {
+      "path": "../../packages/session-query/session-query-sqlite"
+    },
+    {
+      "path": "../../packages/bash/bash-env"
+    },
+    {
+      "path": "../../packages/bash/tool-bash"
+    }
+  ]
+}
