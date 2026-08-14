@@ -177,7 +177,10 @@ function goalSource(source: MessageSource): GoalMessageSource | undefined {
   if (typeof source.goalId !== 'string' || source.goalId.length === 0
     || !Number.isSafeInteger(source.revision) || source.revision < 1
     || !Number.isSafeInteger(source.round) || source.round < 1) {
-    throw new Error('goal message source is invalid')
+    // Fail-safe: a torn in-memory goal event (missing/invalid meta) is skipped
+    // instead of failing the whole fold; real consistency violations are still
+    // rejected loudly downstream by applyGoalEvent.
+    return undefined
   }
   return source
 }

@@ -148,6 +148,16 @@ describe('MarkdownText', () => {
     expect(container.querySelector('pre code a')).toBeNull()
   })
 
+  it('does not pair two stray single tildes (HOME=~/x ... USER=~/y) as strikethrough, but keeps ~~double~~', () => {
+    const source = 'HOME=~/x 与 USER=~/y，以及 ~~真删除线~~ 和 ~单~'
+    const { container } = render(<MarkdownText text={source} />)
+    const del = container.querySelectorAll('del')
+    expect(del).toHaveLength(1)
+    expect(del[0]?.textContent).toBe('真删除线')
+    expect(container.textContent).toContain('HOME=~/x')
+    expect(container.textContent).toContain('USER=~/y')
+    expect(container.textContent).toContain('~单~')
+  })
   it('links inline code through the file-mention resolver: URL first, settled only, never inside links', () => {
     const opened: string[] = []
     const fileMentions = {

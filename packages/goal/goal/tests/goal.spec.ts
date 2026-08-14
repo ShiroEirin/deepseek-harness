@@ -732,7 +732,7 @@ describe('goal replay validation', () => {
     expect(() => foldGoal(clearedSession.events)).toThrow('fresh active revision-one')
   })
 
-  it('rejects non-positive goal round sources', () => {
+  it('skips malformed goal sources instead of failing the whole fold', () => {
     const session = Session.create(SessionId('goal-source-without-meta'))
     const source = { kind: 'goal', goalId: GoalId('goal-missing-meta'), revision: 1, round: 0 } as const
     const turn = nextTurn(session)
@@ -741,7 +741,10 @@ describe('goal replay validation', () => {
       content: [{ type: 'text', text: 'missing' }], source,
     }), { surfaceOp: 'append' })
     session.append('turn/end', { turn, reason: { kind: 'completed' } })
-    expect(() => foldGoal(session.events)).toThrow('goal message source is invalid')
+    // A torn in-memory goal source (invalid round) is skipped, not thrown:
+    // the fold completes with no goal projection instead of failing loudly.
+    expect(() => foldGoal(session.events)).not.toThrow()
+    expect(foldGoal(session.events)).toEqual({ roundsStarted: 0 })
   })
 
   it('rejects malformed snapshots, refs, counters, and timestamps', () => {
