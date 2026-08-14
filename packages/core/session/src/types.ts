@@ -388,6 +388,12 @@ export interface SurfaceIntent {
   sourceEventSeqs?: number[]
 }
 
+/** Append-only extras accepted by {@link Session.append}. */
+export interface SessionAppendOptions {
+  /** Mark a plugin-owned event ignorable so older harnesses skip it instead of rejecting the whole log. */
+  readonly ignorable?: true
+}
+
 /**
  * One immutable entry in the session log.
  *
