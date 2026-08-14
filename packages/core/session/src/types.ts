@@ -390,8 +390,12 @@ export interface SurfaceIntent {
 
 /** Append-only extras accepted by {@link Session.append}. */
 export interface SessionAppendOptions {
-  /** Mark a plugin-owned event ignorable so older harnesses skip it instead of rejecting the whole log. */
-  readonly ignorable?: true
+  /**
+   * Mark a plugin-owned event ignorable so harnesses that do not know this
+   * event type skip it instead of rejecting the whole log. Redundant for
+   * surface events, which are already part of the core vocabulary.
+   */
+  ignorable?: true
 }
 
 /**

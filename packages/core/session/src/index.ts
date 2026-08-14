@@ -611,7 +611,11 @@ export class Session {
       ...surfaceOpts?.sourceEventSeqs === undefined ? {} : { sourceEventSeqs: surfaceOpts.sourceEventSeqs },
       ...surfaceOpts?.surfaceOp === undefined ? {} : { surfaceOp: surfaceOpts.surfaceOp },
     }
-    const ignorable = surfaceOpts?.ignorable === true
+    const rawIgnorable: unknown = surfaceOpts?.ignorable
+    if (rawIgnorable !== undefined && rawIgnorable !== true) {
+      throw new Error(`session event "${type}" carries an invalid ignorable marker`)
+    }
+    const ignorable = rawIgnorable === true
     const dataSnapshot = snapshotJsonValue(data)
     if (dataSnapshot === undefined) {
       throw new Error(`session event "${type}" carries non-JSON-serializable data`)
