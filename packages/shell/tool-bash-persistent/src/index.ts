@@ -237,7 +237,6 @@ function persistentShells(ctx: Context, config: ResolvedConfig): PersistentShell
         const setup = ctx.terminals.startSend(owner, spawned.sessionId, {
           text: 'stty -echo',
           submit: true,
-          expectedPrompt: SHELL_PROMPT,
           signal: combinedSignal,
         })
         const result = await setup.done
@@ -284,7 +283,6 @@ async function executeCommand(
       operation = ctx.terminals.startSend(owner, id, {
         text: first ? wrapped : '',
         submit: first,
-        expectedPrompt: SHELL_PROMPT,
         signal: commandDeadline.signal,
       })
       first = false

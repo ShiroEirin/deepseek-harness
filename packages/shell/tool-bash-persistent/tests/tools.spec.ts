@@ -406,17 +406,6 @@ describe("tool-bash-persistent", () => {
     expect(ctx.tools.get("bash")).toBeUndefined();
   });
 
-  it("declares the persistent prompt as the expected prompt on every send", async () => {
-    const { ctx, owner, stub } = await setup();
-    expect(text(await call(ctx, owner, "echo alpha"))).toBe("hello from stub");
-    expect(text(await call(ctx, owner, "echo beta"))).toBe("hello from stub");
-    const prompts = stub.sessions[0]?.expectedPrompts ?? [];
-    expect(prompts).toHaveLength(3);
-    expect(
-      prompts.every((prompt) => prompt === "__DSH_PERSISTENT_BASH_PROMPT__ ")
-    ).toBe(true);
-  });
-
   it("handles inferred idle, stdin_read fallback, shell exit, clipping, and cleanup", async () => {
     const { ctx, owner, stub, fiber } = await setup({
       backendType: "stub",
