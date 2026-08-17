@@ -66,6 +66,11 @@ export interface TerminalSendRequest {
   text: string
   /** Whether to write the backend's Enter sequence after {@link text}. */
   submit: boolean
+  /**
+   * Exact prompt text expected at readiness when this send changes `PS1`; defaults to
+   * the backend's controlled prompt. Must be non-empty.
+   */
+  expectedPrompt?: string
   /** Cancellation for the wait; backends also interrupt the foreground command. */
   signal?: AbortSignal
 }

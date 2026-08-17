@@ -109,6 +109,7 @@ class StubPtySession implements TerminalBackendSession {
   sends = 0
   pendingText = ''
   historyTruncated = false
+  readonly expectedPrompts: Array<string | undefined> = []
 
   constructor(mode: StubMode) {
     this.mode = mode
@@ -116,6 +117,7 @@ class StubPtySession implements TerminalBackendSession {
 
   startSend(request: TerminalSendRequest): TerminalSendOperation {
     this.sends += 1
+    this.expectedPrompts.push(request.expectedPrompt)
     if (request.text.startsWith('stty -echo')) {
       if (this.mode === 'init-exit') {
         this.statusValue = { kind: 'exited', exitCode: 1, signal: null }
@@ -323,6 +325,15 @@ describe('tool-bash-persistent', () => {
     await fiber.dispose()
     expect(ctx.tools.schemas()).toEqual([])
     expect(ctx.tools.get('bash')).toBeUndefined()
+  })
+
+  it('declares the persistent prompt as the expected prompt on every send', async () => {
+    const { ctx, owner, stub } = await setup()
+    expect(text(await call(ctx, owner, 'echo alpha'))).toBe('hello from stub')
+    expect(text(await call(ctx, owner, 'echo beta'))).toBe('hello from stub')
+    const prompts = stub.sessions[0]?.expectedPrompts ?? []
+    expect(prompts).toHaveLength(3)
+    expect(prompts.every(prompt => prompt === '__DSH_PERSISTENT_BASH_PROMPT__ ')).toBe(true)
   })
 
   it('handles inferred idle, prompt fallback, shell exit, clipping, and cleanup', async () => {

@@ -216,6 +216,30 @@ describe('LocalPtySession readiness and output', () => {
     expect(operation.cancel()).toBe(false)
   })
 
+  it('matches exact readiness against a send-declared expectedPrompt', async () => {
+    vi.useFakeTimers()
+    const terminal = new FakeTerminal()
+    const inspector = new FakeInspector()
+    const session = makeSession(terminal, inspector, config())
+    await initialize(session, terminal)
+
+    const renamed = session.startSend({ text: "PS1='custom> '", submit: true, expectedPrompt: 'custom> ' })
+    await Promise.resolve()
+    await Promise.resolve()
+    await vi.advanceTimersByTimeAsync(0)
+    terminal.emitData('\x1b]133;D;0\x07custom> ')
+    await vi.advanceTimersByTimeAsync(10)
+    expect((await renamed.done).waitReason).toBe('stdin_read')
+
+    const restored = session.startSend({ text: "PS1='dsh> '", submit: true })
+    await Promise.resolve()
+    await Promise.resolve()
+    await vi.advanceTimersByTimeAsync(0)
+    terminal.emitData('\x1b]133;D;0\x07dsh> ')
+    await vi.advanceTimersByTimeAsync(10)
+    expect((await restored.done).waitReason).toBe('stdin_read')
+  })
+
   it('does not reuse a pre-write stdin wait as post-write readiness', async () => {
     vi.useFakeTimers()
     const terminal = new FakeTerminal()

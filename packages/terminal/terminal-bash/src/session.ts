@@ -164,15 +164,16 @@ export class LocalPtySession implements TerminalBackendSession {
   private statusValue: TerminalSessionStatus = { kind: 'running' }
   // TODO(pty-send-state-consolidation): Fold the per-send fields below
   // (active/activeTimer/activeDeadlineTimer/activeAbort/interrupting/
-  // activeWrite/pollingReady/polling) into one send-lifecycle owner; the
-  // cancellation/readiness interplay now has enough pinned tests to carry
-  // that refactor safely.
+  // activeWrite/activePrompt/pollingReady/polling) into one send-lifecycle
+  // owner; the cancellation/readiness interplay now has enough pinned tests
+  // to carry that refactor safely.
   private active: LocalSendOperation | undefined
   private activeTimer: NodeJS.Timeout | undefined
   private activeDeadlineTimer: NodeJS.Timeout | undefined
   private activeAbort: (() => void) | undefined
   private interrupting: LocalSendOperation | undefined
   private activeWrite: Promise<boolean> | undefined
+  private activePrompt = CONTROLLED_PROMPT
   private pollingReady: LocalSendOperation | undefined
   private polling = false
   private promptSeen = false
@@ -241,6 +242,7 @@ export class LocalPtySession implements TerminalBackendSession {
       () => { this.interrupt(operation) },
     )
     this.active = operation
+    this.activePrompt = request.expectedPrompt ?? CONTROLLED_PROMPT
     this.resetReadinessEvidence()
 
     if (request.signal !== undefined) {
@@ -391,10 +393,11 @@ export class LocalPtySession implements TerminalBackendSession {
       this.lastOutputAt = Date.now()
     }
     if (this.promptSeen && sanitized.promptTail !== undefined) {
-      const remaining = Math.max(0, CONTROLLED_PROMPT.length + 1 - this.promptTail.length)
+      const expected = this.activePrompt
+      const remaining = Math.max(0, expected.length + 1 - this.promptTail.length)
       this.promptTail += sanitized.promptTail.slice(0, remaining)
-      if (sanitized.promptTail.length > remaining) this.promptTail = `${CONTROLLED_PROMPT}\0`
-      this.promptTextSeen = this.promptTail === CONTROLLED_PROMPT
+      if (sanitized.promptTail.length > remaining) this.promptTail = `${expected}\0`
+      this.promptTextSeen = this.promptTail === expected
     }
   }
 
@@ -509,6 +512,7 @@ export class LocalPtySession implements TerminalBackendSession {
     if (this.interrupting === operation) this.interrupting = undefined
     this.pollingReady = undefined
     this.active = undefined
+    this.activePrompt = CONTROLLED_PROMPT
   }
 
   private failActive(error: unknown): void {
