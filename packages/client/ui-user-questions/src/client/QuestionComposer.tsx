@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react'
 import clsx from 'clsx'
 import {
   Button, IconCheckOutline14, IconChevronDownOutline14, IconChevronLeftOutline14,
@@ -123,12 +123,30 @@ export function QuestionComposer(props: QuestionComposerProps) {
     : <PlanReviewPanel key={question.key} pending={question} review={review} t={props.t} />
 }
 
+/**
+ * Session-scoped draft cache: a session switch unmounts and remounts the
+ * composer, and a same-request replay (same key, new carrier) would otherwise
+ * lose in-flight answers. Drafts are keyed by the pending request key so
+ * different requests never share state; entries are dropped once the request
+ * is answered or cancelled.
+ */
+const draftCache = new Map<string, DraftAnswer[]>()
+
 function QuestionFlow({ pending, t }: { pending: PendingQuestion } & Pick<QuestionComposerProps, 't'>) {
   const questions = pending.questions
   const [index, setIndex] = useState(0)
-  const [drafts, setDrafts] = useState<DraftAnswer[]>(() => questions.map(() => ({
-    selected: [], custom: '', skipped: false,
-  })))
+  const [drafts, setDrafts] = useState<DraftAnswer[]>(() => {
+    const cached = draftCache.get(pending.key)
+    if (cached !== undefined && cached.length === questions.length) return cached
+    return questions.map(() => ({
+      selected: [], custom: '', skipped: false,
+    }))
+  })
+  // Mirror every edit into the cache so a remount after a session switch
+  // restores it; the request key keeps different pending requests apart.
+  useEffect(() => {
+    draftCache.set(pending.key, drafts)
+  }, [drafts, pending.key])
   const [busy, setBusy] = useState<'answer' | 'cancel' | null>(null)
   const [error, setError] = useState<Feedback | null>(null)
   // Collapsed to the header strip so the conversation above stays readable
@@ -148,7 +166,9 @@ function QuestionFlow({ pending, t }: { pending: PendingQuestion } & Pick<Questi
   const cancelFlow = (): void => {
     setBusy('cancel')
     setError(null)
-    void pending.cancel().catch((cause: unknown) => {
+    void pending.cancel().then(() => {
+      draftCache.delete(pending.key)
+    }).catch((cause: unknown) => {
       setBusy(null)
       setError({ text: cause instanceof Error ? cause.message : String(cause) })
     })
@@ -200,7 +220,9 @@ function QuestionFlow({ pending, t }: { pending: PendingQuestion } & Pick<Questi
     }
     setBusy('answer')
     setError(null)
-    void pending.answer(answer).catch((cause: unknown) => {
+    void pending.answer(answer).then(() => {
+      draftCache.delete(pending.key)
+    }).catch((cause: unknown) => {
       setBusy(null)
       setError({ text: cause instanceof Error ? cause.message : String(cause) })
     })
