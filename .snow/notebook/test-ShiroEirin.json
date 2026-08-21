@@ -1,0 +1,1069 @@
+{
+  "../../VCP/vcp-memory-dsh/vcp-memory-dsh-plan.md": [
+    {
+      "id": "notebook-1785872645710_mwwjxa3o8",
+      "filePath": "../../VCP/vcp-memory-dsh/vcp-memory-dsh-plan.md",
+      "note": "战略转向（2026-08-05，用户决策）：放弃\"GPT 一次性实现 spec v2.3 全量\"，改为 MVP 切片 + 迭代路线。原因：VCP 协议/算法密度过高，一次性大块交付验证赤字、周期不可控。新路径 = M0 MVP（契约面保持 spec v2.3 一致，内部极简，health.capabilities.durableAsyncJobs=false 诚实降级，async 返回 rejected/not-supported，适配器按 §5.5 fail-open 退化 sync）→ M1 双 Worker → M2 durable jobs → M3 outbox+generation → M4 Tag 图 → M5 TagMemo → M6 Residual+anchored_gs（Rust golden fixtures 对拍）→ M7 import+retention+P0-P8 → M8+ V10。MVP 任务书：artifacts/mvp-task.md（范围/能力降级声明/验收 10 项/对 GPT 四约束）。spec v2.3 与 plan v4.3 保留为总契约与总纲（不废），每轮迭代以其为锚。附带的\"DSH 自持进化\"想法（用户提出：自持实现而非外部迁移）暂以 M0 跑通后的迭代为自然衔接，spike 验证暂不单独立项。",
+      "createdAt": "2026-08-05T03:44:05.710",
+      "updatedAt": "2026-08-05T03:44:05.710"
+    },
+    {
+      "id": "notebook-1785862941957_grjlmvpma",
+      "filePath": "../../VCP/vcp-memory-dsh/vcp-memory-dsh-plan.md",
+      "note": "可行性审查报告（2026-08-05，artifacts/feasibility-review.md，未改 spec/plan）：核心结论——①cordis 壳/存储/摄取可行；②🔴 高风险：VCP tagIndex 的 computeIntrinsicResiduals/OrthogonalProjection/Handshakes 全是 Rust 方法（TagMemoEngine.js :3275/:3877、ResidualPyramid :140/:225），anchored_gs 无 JS 参考实现，GPT\"JS 等价\"是 2-4 天不确定工作；③传播主循环 :683-954/两段式 :514-519/FIR :695-705/noiseSignal=(1-directionCoherence)×(1-avgPairwiseSim) :310 与 spec 逐条吻合✅；④VCP 生产 embedding=gemini-embedding-001（EmbeddingUtils :45），bge 替代后语义阈值（0.65/0.92/0.97）需校准非真理；⑤node:sqlite 下限应 22.13（22.5-22.12 需 flag）；⑥过度设计清单：Config 80 字段→砍到~20（其余 VCP 默认值常量表 src/shared/vcp-defaults.ts）、jobs checkpoint/lease 第一版可省（幂等键+全量重建兜底）、读插队可砍、anchored_gs 允许简化（gain 恒 1.0+diagnostics 或 maxBasis=2）；⑦工作量现实 16-24 天 vs plan 1 周；⑧GPT 提示词三约束：范围声明/等价性声明/诚实性声明（README 差异一节）。",
+      "createdAt": "2026-08-05T01:02:21.957",
+      "updatedAt": "2026-08-05T01:02:21.957"
+    },
+    {
+      "id": "notebook-1785859217083_ynv3vttws",
+      "filePath": "../../VCP/vcp-memory-dsh/vcp-memory-dsh-plan.md",
+      "note": "2026-08-04 第八轮（4 子代理并行 + 3 点复审）：DSH 侧① ~/.dsh/config.yaml 是个人 overlay patch 列表非 entry 列表（vendor/include/src/index.ts applyEntryPatches：insert patch 追加/PatchOptions{id,insert,name,config,disabled...}）——plan §4.2 已重写为 insert 语法；entry.name=npm 包或相对路径（相对配置目录），推荐绝对/相对路径指向构建产物规避 verify-cordis-config 第三条 bare plugin 检查；外部插件三路径（npm/相对路径、repository-plugin github:owner#ref&path、cordis_mount 沙箱受限 OBJECT 形态 inject 白名单）。② lesson 判定修正：data.error 仅 HarnessError 带 info 时写（tool-calls.ts:281-288），普通 Error 失败只有 message.isError=true——判定 = data.error OR message.isError。③ 防回灌补 compact summary 路径（surfaceOp replace + COMPACT_CHECKPOINT_SOURCE）。④ prompt-submit 消费端确认：next() 默认 allow、additionalContexts 变独立 durable user/message（agent.ts:466-468+549-551）、block.reason 不被消费。⑤ session/event：append 同步 fire-and-forget per-listener 隔离（session/index.ts:343-360）、seq=log.length、firstLiveSeq=seed 长度、end-seed 构造器写。⑥ ToolRegistry inject ['systemPrompt']、register 精确 disposer、guard 单调、restrict 仅 agent-scoped。⑦ session-query.listEvents 离线补采备选。⑧ @cordisjs/ln=plugin-include（vendor/include）；无 'ln' 服务（inject 精确匹配）。VCP 侧① 查询入口 applyTagBoost(:962)/geodesicRerank(:1601) 非 query()；② 构建期 file_tags.position（非 chunk_tags）→spec 改 memory_tags；③ 补 tag_intrinsic_residuals 表+v9_anchor_gain[0.5,2.0]（anchored_gs：maxNeighbors48/maxBasis4/0.75/1.25/1.0/0.5/2.0，Rust 计算需 JS 等价）；④ 序位势能 PHI0.9/0.5+semanticGain 钟形(0.65/0.25)+forwardGain1.0/reverseGain0.35(生产)/0.42(源码)+反转守卫0.9+distanceDecay0.08；⑤ KNN 种子=传播种子+最终融合候选（修正'仅种子'）；⑥ Core Tag 补全=融合锚点非扩散种子(:1203-1205)；⑦ 去重三阈值：Tag 级0.88(20%能量转移)/候选0.92/最终0.97；⑧ 时间衰减 halfLifeDays30/minScore0.5（默认关）；⑨ 无 FTS5（插件层 BM25+jieba），spec 保留 FTS5 注明差异；⑩ 无'经验识别'蒸馏；⑪ Tag 提取=textPreprocessor 末尾 Tag: 行规则（maxTags50/黑名单/分隔符）；⑫ Rust 集成点：pairwise-sim/IR/matrix-rebuild/EPA basis，bundle 存在时查询纯 JS 可用，重建需 JS 等价。",
+      "createdAt": "2026-08-05T00:00:17.083",
+      "updatedAt": "2026-08-05T00:00:17.083"
+    },
+    {
+      "id": "notebook-1785857301661_q67iw8dkj",
+      "filePath": "../../VCP/vcp-memory-dsh/vcp-memory-dsh-plan.md",
+      "note": "DSH 官方插件 API（docs/ 确认，2026-08-04 快照 69a6875）：① 采集=ctx.on('session/event',(session,event))，SessionEvent={type,seq,time,data}，seq 官方单调序列号；14 变体（turn/start|end、step/start|end、user/message、assistant/chunk|message、tool/call|result、steering/message、todo/write、request/header|context、session/end-seed），可 merge-extensible。② 注入=ctx.on('agent/prompt-submit',(agent,message,signal,next)=>Promise<PromptDecision>)，PromptDecision={kind:'allow',content?,additionalContexts?}|{kind:'block',reason}；additionalContexts 会变成 durable user/message。备选：agent.inject()（不跑模型）、system-prompt/assemble（改 assembly）。③ resume 检测=agent/session-start 的 source('startup'|'resume'|'clear'|'compact')，或 request/header reason('initial'|'resume'|'change')、session/end-seed 标记。④ tool/result 失败判定=event.data.error:{name,code}。⑤ 防回灌可用 user/message.source.kind（user vs plugin）判定。⑥ 工具=ctx.tools.register(defineTool(...))，ctx.tools.guard/pre-execute/execute/post-execute/result 管线。⑦ postmortem 0001：命名导出插件（name/inject/apply）禁 export default（Loader unwrapExports 优先 .default 丢 inject）！纯 default 类插件（元数据在静态字段）不受影响。⑧ 官方 feature map：Memory = section provider + tool。⑨ agent 接口：followup=next-turn/wakeup、steer=next-step/wakeup、inject=next-step/no-wakeup、send(message,{target,wakeup})、agent.ctx scoped。",
+      "createdAt": "2026-08-04T23:28:21.661",
+      "updatedAt": "2026-08-04T23:28:21.661"
+    }
+  ],
+  "../vcp-memory-cordis-gpt-spec.md": [
+    {
+      "id": "notebook-1785861993049_i1e1x0a1g",
+      "filePath": "../vcp-memory-cordis-gpt-spec.md",
+      "note": "QA 复审第二轮（3C/4H/4P）12 项全修复（2026-08-05）：C1 package.json 去 // 注释 + schemastery ^1.5.0→^3.18.0（npm view 实测 3.18.0=latest=DSH vendor 版本；QA 说 1.5.0 不存在正确）；C2 tags.embedding 单槽→tag_vectors(tag_id,generation) 表（与 chunk 同 generation 契约）；C3 MemoryJobEvent 加 result?: JobResult 判别联合（upsert/reindex/retention/import，jobs.result 解析值，重启后 getJob/awaitJob 可恢复）；H1 tag_intrinsic_residuals 删 status 列（值表只存 computed，failed/insufficient 只入 status 表）；H2 tag_edges 加 generation 列 + PK/索引改 (namespace,generation,...)（同代查询确定性）；H3 vector_outbox 改 seq INTEGER PRIMARY KEY AUTOINCREMENT + mutation_id UNIQUE（崩溃恢复按 seq 升序回放，remove 后新 upsert 不乱序）；H4 Config 新增 ingestion{maxChunksPerMemory:200,maxTagsPerMemory:50,batchSizePerTransaction:20} 并同步 §6.1/§7 引用；H5 MutationReceipt 加 rejected 变体 + MemoryErrorCode（disabled/limit-exceeded/validation/not-found/internal）+ 冻结失败语义（enabled:false query 空结果不抛错/mutation rejected；remove 不存在=skipped 幂等）。plan 同步：cordis 精确 pin 3 处、API 补 getJob/awaitJob/cancelJob、包结构去 collector/rivermemo/forget（对齐 spec §4）、tags 必选改可选+KNN-only 合法、工具名 forget 注明内部调 remove。版本标注 v2.1-rc（未冻结，需 QA 复核通过升 v2.1）。JSON 块 node -e 验证合法。retention 段修复了误删的 ① 行 + ttlDays 重复字段（TS2300）。",
+      "createdAt": "2026-08-05T00:46:33.049",
+      "updatedAt": "2026-08-05T00:46:33.049"
+    },
+    {
+      "id": "notebook-1785860528281_buttwz6b2",
+      "filePath": "../vcp-memory-cordis-gpt-spec.md",
+      "note": "v2.1 终轮一致性扫描（2026-08-05）闭合：修复 9 处残留——版本 v2.0→v2.1、§2.1 vector_state→generation-keyed、MemoryScope.namespace 必填（QA M1）、diagnostics.tagless 类型补全（QA C3）、§10.1 中文目录 slug+hash 保底（QA H7）、§12 maxStates→v91MaxPropagationStates、§14 风险表同步、plan 版本引用 v2→v2.1、plan query 签名补 coreTags 提示。剩余 2 处 vector_state/refluxFactor 均为说明性历史注释（旧名→新名映射），非错误。spec 正式冻结，可交付 GPT。",
+      "createdAt": "2026-08-05T00:22:08.281",
+      "updatedAt": "2026-08-05T00:22:08.281"
+    },
+    {
+      "id": "notebook-1785860232746_pb8nhoj1x",
+      "filePath": "../vcp-memory-cordis-gpt-spec.md",
+      "note": "2026-08-04 第九轮（QA deep review，6C/9H/3M 全修复）：实证——① FTS5 trigram 中文：≥3 字子串有效（\"文件系统\"命中）、2 字词（\"项目\"）失配、unicode61 全失败 → FTS 表改 trigram + <3 字词 LIKE 兜底 + 中文测试集；② reverseAnchorBoost 生产配置=1（启用）——spec 改默认 true；③ anchored_gs 完整算法（rust-vexus-lite/src/lib.rs:2100-2175+2630-2750）：minNeighbors=3/semantic_gate 钟形+hard_floor 硬过滤/贪心正交基 score=|dot|×orth_norm×ln(1+w)×semantic/minGain 停止/raw clamp[0,1]/v9_anchor_gain=clamp(0.75+1.25×r^1.0,[0.5,2.0])/发布协议（DELETE→artifacts INSERT（含 effective_config JSON）→residuals INSERT→status 表 computed/failed/insufficient_neighbors）/查询期只读；④ IntrinsicResidualConfig 含 position_decay。修复：C1 分块=min(model_max_length,cfg)×0.85（BGE512→≈435，VCP 6800 是 gemini 的）；C2 MemoryQueryInput+coreTags；C3 Tag 优先级 input.tags>尾部Tag行>KNN-only(diagnostics.tagless)+适配器必须投喂 tags；C4 anchored_gs 7 步完整；C5 chunk_vectors(generation) 表+active_generation 指针（单槽无法 staging）；C6 jobs 补 payload/checkpoint/result/attempts/lease+API getJob/awaitJob/cancelJob；H1 vector_outbox（pending/done/failed+attempts）+发布前校验；H2 defaultEngine 默认 knn（VCP parity）；H4 传播公式两段式（main 全边归一化+reserve 仅虫洞边归一化，VCP :513-521）；H5 安全边界（canonical escaping/密钥预存+预渲染过滤/对抗测试）；H7 collection Unicode 正则 ^[\\p{L}][\\p{L}\\p{N}_.-]{0,63}$；H8 retention 语义冻结（过期排除/确定性淘汰/完整删除/jobs 清理）；H9 §13 统一 Service.init disposer；M1 get(namespace,id)/stats namespace 必填；M2 cordis 精确 pin 4.0.0-rc.7+schemastery dependencies；M3 补 6 索引。",
+      "createdAt": "2026-08-05T00:17:12.746",
+      "updatedAt": "2026-08-05T00:17:12.746"
+    },
+    {
+      "id": "notebook-1785858429219_82nk94hfj",
+      "filePath": "../vcp-memory-cordis-gpt-spec.md",
+      "note": "2026-08-04 第七轮（DSH packages/ + VCPToolBox 源码级双验证）：DSH 侧全部确认 ✅——prompt-submit (agent,message,signal,next)→PromptDecision（agent/types.ts:380 waterfall）；PromptDecision=allow{content?,additionalContexts?:UserMessage[]}|block{reason}；session-start source=startup|resume|clear|compact；agent.inject()=next-step/no-wakeup 空闲直接 append user/message（官方模式：文件变更/AGENTS.md/skill 均此注入）；ctx.systemPrompt 服务（名 systemPrompt！）有 section/context/tools/variable/assemble 五方法，PromptSection/PromptContext={name,order,text:string|fn}，order 约定 -100/0/100-199；SessionEventMap 14 变体源码确认（session/types.ts:209-311）+seq 单调+tool/result.error:{name,code}+session/end-seed+TurnTrigger message/retry/injection；tools 管线 pre-execute/execute/post-execute/result/change；defineTool：output.schema 必填+render+execute+ToolArgsError+timeoutMs>0。VCP 侧修正 9 处：① 动量=普通边跳数预算（2.0 初值每跳-1虫洞不减，非能量乘数！）；② 回流=立即折返×0.15（neighbor===previousNode，非\"2跳禁止\"）；③ 补衰减 injectedCurrent=energy×coocWeight×decayFactor(普通0.25/虫洞0.70)×flowFactor；④ coherence=patternStrength（内部张力）非方向一致性，directionCoherence 用于 novelty；⑤ EPA 投影明确不实现（Residual 用原始向量差值）；⑥ 分块 tiktoken→transformers.js tokenizer（句子+0.85边界+10%重叠，策略等价去 WASM）；⑦ semanticDedupThreshold 0.95→0.92 + sourcePriority(rag50>time45>bm25_40>continuity35>associate10)；⑧ FIR=accumulatedEnergy 按 hop 累加 firWeights；⑨ 虫洞判定 tension=coocWeight×neighborResidual（wormholeEdges 集合优先）。",
+      "createdAt": "2026-08-04T23:47:09.219",
+      "updatedAt": "2026-08-04T23:47:09.219"
+    },
+    {
+      "id": "notebook-1785858084497_ysfeq3txi",
+      "filePath": "../vcp-memory-cordis-gpt-spec.md",
+      "note": "2026-08-04 第六轮（深度复核最新分支 VCP\\VCPToolBox，git main 4b0d01a4 'RiverMemo V3.1'）——V9.1 完整参数表（rag_params.json v9 段 + TagMemoEngine.js srConfig 为准）：outboundMass=0.95（⚠️曾误写1.0）、associationReserveMass=0.05（虫洞从 reserve 竞争）、evidenceCompression=1（evidence=log1p(weight×compression)，:473）、wormholeGain=1.35、tensionThreshold=1.0（虫洞判定 evidence×residual≥t，:475）、hubPenaltyExponent=0.3/floor=0.55/ceiling=1.8、hubSmoothingRatio=0.1、maxSafeHops=4、baseMomentum=2.0、firingThreshold=0.10、baseDecay=0.25、wormholeDecay=0.70、maxNeighborsPerNode=20、v91ReturnFlowFactor=0.15（immediateReturn 时 flowFactor=0.15，:768，旧名 refluxFactor）、v91FirGamma=0.6（clamp[0.05,0.95]）、v91MaxPropagationStates=2000（⚠️曾误写64）、maxEmergentNodes=50。⚠️ topTags 不是 VCP 参数（本插件自定义 8）。VCPToolBox-main（zip）无 TagMemoEngine.js 是旧版；最新分支还有 TagMemoV10Engine.js（modules/tagmemoV10/：immutable/provenance/relativeTopology/dstc）+ RiverMemo V3.1（Softmax 河网形态）——V10 与 Rust 管线绑定（生产已切 V10），本 spec 明确复刻 V9.1 基线不受影响。",
+      "createdAt": "2026-08-04T23:41:24.497",
+      "updatedAt": "2026-08-04T23:41:24.497"
+    },
+    {
+      "id": "notebook-1785857962064_36592g3sq",
+      "filePath": "../vcp-memory-cordis-gpt-spec.md",
+      "note": "2026-08-04 第五轮审查（对齐 VCP 原源码 + 官方 docs）修复清单：① V9.1 参数补齐——wormholeGain=1.35（预算内 conductance 加权，非'无×1.35'）、baseMomentum=2.0、firGamma=0.6（hop 权重 γ^hop 归一化）、wormholeDecay=0.70、firingThreshold 0.01→0.10（对齐 TagMemoEngine.js:458/685/695/688/686）；② §8.4 补 tagMemoActivation = coverage×coherence×(1-noise)（ResidualPyramid.js:347），activation 兼用于 β 融合与 Tag 感应；③ §2.1/§13 的'一切注册走 ctx.effect()'与 §5.2 的'[Service.init] 返回 disposer 禁 ctx.effect'矛盾——统一为 disposer 管理（GPT 按 §2.1 写会双启动）；④ static inject 不标注 string[]（cordis inject 类型是 (keyof Context)[]，标注会 TS 报错）；⑤ §1.1 素材样例中性化（tool/result→'工具执行失败事件'等，移除 DSH 特定事件名）；⑥ §10.1 迁移补 source.type='vcp-dailynote'。实证：node:sqlite 支持 FTS5 ✅（Windows node 直接验证）。",
+      "createdAt": "2026-08-04T23:39:22.064",
+      "updatedAt": "2026-08-04T23:41:24.390"
+    }
+  ],
+  "../../VCP/vcp-memory-dsh/vcp-memory-cordis-gpt-spec.md": [
+    {
+      "id": "notebook-1785869670108_36yzc7l3d",
+      "filePath": "../../VCP/vcp-memory-dsh/vcp-memory-cordis-gpt-spec.md",
+      "note": "对照真实代码终审通过（2026-08-05，第二轮）：spec v2.3 全部源码引用逐条验证命中——构建期（TagMemoEngine :2863 PHI 0.9/0.5、:2870 forwardGain 1.0、:2873 reverseGain 源码 0.42/生产 0.35、rag_params :315-316 clamp 0.25/0.6、:317 distanceDecay 0.08、:319 reverseAnchorMax 1.35、:324 guard 0.9、:2894 anchorBoost boolean 兼容 1、:2907-2917 semGain 钟形 0.15 分段、:2959/:3069 tag>100 跳过）、传播期（:750-876 FIRING/momentum/decay/momentumCost/isImmediateReturn/flowFactor/injectedCurrent<0.01/FIR）、anchored_gs（lib.rs :2041-2058 semantic_gate 逐行、:2685-2700 单轨映射+v8_3 NULL+状态版本化）、Residual（ResidualPyramid :310/:347）、去重（:1256-1302 0.88+20% 转移）、Tag 提取（textPreprocessor :34/:64-85）、position=index+1（ingestionPipeline :306 + tagConsistencyService :198）、V10（TagMemoV10Engine :48 v10_alpha、RiverMemoEngine :24 topology-v3.1）、cordis（service.ts :57 reflect.provide、fiber.ts :79-80/:410-412 disposer 逆序收集）。3 处轻微：①reverseAnchorMax 源码默认 1.5 未标注（spec 只写生产 1.35）；②maxReverseGain 源码默认 0.70 未标注（spec 只写生产 0.6）；③§8.4 无 EPA 融合公式 = activationMultiplier 直接 clamp，VCP dynamicBoostFactor 含 logicDepth/entropy/resonance（spec 已明示'替代'，建议 README 差异节强调）。无行号错误。结论：spec v2.3 可交付。",
+      "createdAt": "2026-08-05T02:54:30.108",
+      "updatedAt": "2026-08-05T02:54:30.108"
+    },
+    {
+      "id": "notebook-1785869441259_rxhvu6bu6",
+      "filePath": "../../VCP/vcp-memory-dsh/vcp-memory-cordis-gpt-spec.md",
+      "note": "终审通过（2026-08-05，spec v2.3 1047 行 + plan v4.3 510 行全文复核）：spec 新增 §5.5 DSH 兼容 Profile（health apiVersion/capabilities 握手、async durable、prompt 桥 AbortSignal、工具 sync→queued awaitJob、P6 DSH-shaped consumer test 零 DSH import）、§6.5 首版不预留 V10 字段、§17 V10-V0~V5 路线（EPA 前置/fail-closed/Rust fixtures/native 需用户批准）；DDL 新增 outbox CHECK 约束+target_kind 多态、tagmemo_artifacts graph_revision、residual 只追加 staging+active_residual_artifact 原子发布、graph_revision stale 机制（重建期 neutral gain=1.0+residualStatus degraded）、jobs cancel_requested；§9 Config 精简至 ~20 字段+vcp-defaults.ts 常量表+BGE 阈值校准声明；§7 tiktoken 理由修正+注入边界诚实声明；§8.3 anchored_gs 稳定排序/tie-break/固定遍历序+golden fixtures 容差对拍+gain=1.0 仅限 degraded。plan v4.3：采集桥 durable inbox（stateFor/buffer/draining guard/pendingJobs ledger/commitStateAtomically fsync+rename/catch-up 补采/dead-letter）、注入桥 next() 合并+fail-open+防重复注入、工具桥 sync→queued awaitJob、workspace 映射 O-4 方案（ws-+hash32 原子持久化）、C5 自指循环重新表述（配置树重载非模型自挂）、§13 O-2/O-4 诚实标注。机械检查：spec 30 fence(15对)/plan 18(9对)✅、JSON 合法✅、无旧引用（v2.1/ctx.provide/Node22.5/^4.0.0-rc.7/openai）✅、apiVersion '2.3' 两文档一致✅。唯一流程遗留：qa-review.json 的 pass 是 v2.2 快照，v2.3 增量未经独立 QA 复核（本次人工核对无矛盾）；文档日期写 08-04。",
+      "createdAt": "2026-08-05T02:50:41.259",
+      "updatedAt": "2026-08-05T02:50:41.259"
+    }
+  ],
+  ".snow/notebook/dshx-plugins.md": [
+    {
+      "id": "notebook-1786006948368_ti80u7i9w",
+      "filePath": ".snow/notebook/dshx-plugins.md",
+      "note": "验证三板斧：dshx list（[on]）、dshx verify（import probe: ok + peer 解析版本）、cd ~/.dsh/source/current && ./bin/dsh web --dump-config | grep <id>（配置树可解析 exit=0）；WSL 里无 rg 只有 grep；node 实际 22.21.1（nvm use 24 不生效但 DSH 要求 ^22.19||>=24 满足）；上滑卡住=issue #220 核心 ChatView.tsx 无补丁，插件修不了",
+      "createdAt": "2026-08-06T17:02:28.368",
+      "updatedAt": "2026-08-06T17:02:28.368"
+    },
+    {
+      "id": "notebook-1786006948368_ggl3gg7a6",
+      "filePath": ".snow/notebook/dshx-plugins.md",
+      "note": "批次2 三个插件的 lib/client.js 注册 id 已是标准 @dsh-external/<id>（web-ui-notify/chat-width/ui-progress），无需改 client.js——与批次1 三个需改注册名的插件不同；install --enable --yes 后必须 dshx repair（重建投影，本批 26 links 含 peer relink: chat-width→react；ui-progress→ui-primitives/tool-todo/cordis/react 全部从宿主 vendor 链接）",
+      "createdAt": "2026-08-06T17:02:28.368",
+      "updatedAt": "2026-08-06T17:02:28.368"
+    },
+    {
+      "id": "notebook-1786006948368_fcjr85fqw",
+      "filePath": ".snow/notebook/dshx-plugins.md",
+      "note": "纯 client 双面包插件（package.json 有 dshClient 声明但无 dsh.plugin.json）需手动补 dsh.plugin.json：{id: kebab-case, version, main: ./lib/index.js, engines:{dsh:>=0.0.1}, contributes:{tools:[],skills:[]}}——web-ui-notify/chat-width 都补了；id 必须与 client bundle 注册名 @dsh-external/<id> 对齐",
+      "createdAt": "2026-08-06T17:02:28.368",
+      "updatedAt": "2026-08-06T17:02:28.368"
+    },
+    {
+      "id": "notebook-1786006948368_be3phkxij",
+      "filePath": ".snow/notebook/dshx-plugins.md",
+      "note": "20260806 批次2 已装 3 个 WebUI 体验插件（全部 [on]）：dsh-web-ui-notify（审批/提问/轮次完成桌面通知，需浏览器授权：设置→通用→桌面通知→开启）、chat-width（消息列宽度拖拽，localStorage 持久化，手柄仅会话页 hover 显现）、dsh-ui-progress（常驻进度条+加载圈；report_progress 卡片因宿主无此工具暂闲置，进度条仍可用）",
+      "createdAt": "2026-08-06T17:02:28.368",
+      "updatedAt": "2026-08-06T17:02:28.368"
+    },
+    {
+      "id": "notebook-1786005350811_hbvlt050z",
+      "filePath": ".snow/notebook/dshx-plugins.md",
+      "note": "修复后 dshx verify 8 插件全部 import probe ok；config.yaml overlay 已指向新 revision（skills-manager 1de2180a / memory-evolve 2160dab / message-edit 769301a）",
+      "createdAt": "2026-08-06T16:35:50.811",
+      "updatedAt": "2026-08-06T16:35:50.811"
+    },
+    {
+      "id": "notebook-1786005350811_azct2ootr",
+      "filePath": ".snow/notebook/dshx-plugins.md",
+      "note": "踩坑6：client-modules 注册名不匹配——dsh web 启动报 \"loaded without registering @dsh-external/xxx via __ModuleLoader__.load\"：插件 client bundle 硬编码作者手装约定名（@dsh-local/skills-manager、@dsh-local/dsh-memory-evolve、moeblack/message-edit），但 marisa 把插件投影到 @dsh-external/<id> 命名空间，DSH 期望 bundle 注册名=@dsh-external/<id>。修复：Windows 侧源 client.js 替换 id + dshx update <id> <dir> --yes 生成新 revision（update 而非 install，install 会报 already installed）",
+      "createdAt": "2026-08-06T16:35:50.811",
+      "updatedAt": "2026-08-06T16:35:50.811"
+    },
+    {
+      "id": "notebook-1786002978917_vmyxev95m",
+      "filePath": ".snow/notebook/dshx-plugins.md",
+      "note": "Windows 原生方案：dsh-win-port 9 补丁（基线 20260804 快照 43086bf）+ dsh-desktop(Wails+WebView2) + dsh-shell-windows + dsh-pty-windows，0009 no-sandbox 姿态",
+      "createdAt": "2026-08-06T15:56:18.917",
+      "updatedAt": "2026-08-06T15:56:18.917"
+    },
+    {
+      "id": "notebook-1786002978917_v3w3gda9r",
+      "filePath": ".snow/notebook/dshx-plugins.md",
+      "note": "dshx doctor host.version ✗（dsh 0.0.1 版本号太怪，semver 校验不过），不影响使用",
+      "createdAt": "2026-08-06T15:56:18.917",
+      "updatedAt": "2026-08-06T15:56:18.917"
+    },
+    {
+      "id": "notebook-1786002978917_i2oc77aa2",
+      "filePath": ".snow/notebook/dshx-plugins.md",
+      "note": "WSL 环境：dsh 0.0.1 / node 22.21.1 / linux-x64，current → staging-20260805T142050Z（新快照已装好）",
+      "createdAt": "2026-08-06T15:56:18.917",
+      "updatedAt": "2026-08-06T15:56:18.917"
+    },
+    {
+      "id": "notebook-1786002978917_8t4jwubfv",
+      "filePath": ".snow/notebook/dshx-plugins.md",
+      "note": "config.yaml 已有 dsh-memory-adapter 指向 /mnt/d/github/VCP/vcp-memory-dsh/packages/dsh-memory-adapter/dist/index.js（dist 存在，minimal 实现已存在，非 spec 阶段）",
+      "createdAt": "2026-08-06T15:56:18.917",
+      "updatedAt": "2026-08-06T15:56:18.917"
+    },
+    {
+      "id": "notebook-1786002978917_t52tbade0",
+      "filePath": ".snow/notebook/dshx-plugins.md",
+      "note": "已安装 8 插件：dsh-tool-calculator/json/time/encoding + dsh-session-search + dsh-skills-manager + dsh-message-edit(id 改为 dsh-message-edit) + dsh-memory-evolve，全部 [on] 写入 ~/.dsh/config.yaml dshx managed block",
+      "createdAt": "2026-08-06T15:56:18.917",
+      "updatedAt": "2026-08-06T15:56:18.917"
+    },
+    {
+      "id": "notebook-1786002978917_8oeweubo7",
+      "filePath": ".snow/notebook/dshx-plugins.md",
+      "note": "踩坑5：dsh-tool-* 四件套无 lib/ 编译产物（源码 src/ 带 .ts 后缀 import）→ npx esbuild bundle 生成 lib/index.js，--external:cordis --external:@deepseek-ai/dsh-tools，encoding 需加 --platform=node（用了 node:crypto）",
+      "createdAt": "2026-08-06T15:56:18.917",
+      "updatedAt": "2026-08-06T15:56:18.917"
+    },
+    {
+      "id": "notebook-1786002978917_scypbq9ve",
+      "filePath": ".snow/notebook/dshx-plugins.md",
+      "note": "踩坑4：插件 dependencies 不被 marisa 自动提供 → 需移到 peerDependencies（从宿主 checkout vendor 链接）或插件目录自带 node_modules。dsh-session-search 的 schemastery 移入 peerDeps 后成功",
+      "createdAt": "2026-08-06T15:56:18.917",
+      "updatedAt": "2026-08-06T15:56:18.917"
+    },
+    {
+      "id": "notebook-1786002978917_abqgshxl2",
+      "filePath": ".snow/notebook/dshx-plugins.md",
+      "note": "踩坑3：marisa 清单格式两种——dsh.plugin.json（id 必须 kebab-case，moeblack/message-edit 会校验失败）或 package.json 的 dshx 字段（纯 cordis 插件）",
+      "createdAt": "2026-08-06T15:56:18.917",
+      "updatedAt": "2026-08-06T15:56:18.917"
+    },
+    {
+      "id": "notebook-1786002978917_9kpod8twy",
+      "filePath": ".snow/notebook/dshx-plugins.md",
+      "note": "踩坑2：marisa 自身依赖 semver+tar，install.sh 不装依赖 → 需先在仓库目录 npm install 再跑 install.sh（否则 dshx list 报 ERR_MODULE_NOT_FOUND）",
+      "createdAt": "2026-08-06T15:56:18.917",
+      "updatedAt": "2026-08-06T15:56:18.917"
+    },
+    {
+      "id": "notebook-1786002978917_3k6oyytiq",
+      "filePath": ".snow/notebook/dshx-plugins.md",
+      "note": "踩坑1：Windows git core.autocrlf=true 导致 clone 的 install.sh 变 CRLF，bash 执行报 $'\\r' 错误 → 需批量转 LF（PowerShell 正则替换）",
+      "createdAt": "2026-08-06T15:56:18.917",
+      "updatedAt": "2026-08-06T15:56:18.917"
+    },
+    {
+      "id": "notebook-1786002978917_5tt1m9tb4",
+      "filePath": ".snow/notebook/dshx-plugins.md",
+      "note": "dshx (marisa) 插件管理器安装记录：源码在 D:\\github\\dsh-external-review（Windows 侧 clone，WSL 通过 /mnt/d 共享，无需复制进 WSL）",
+      "createdAt": "2026-08-06T15:56:18.917",
+      "updatedAt": "2026-08-06T15:56:18.917"
+    }
+  ],
+  "packages/llm/token-meter/src/index.ts": [
+    {
+      "id": "notebook-1786077559684_zzxhxe7vm",
+      "filePath": "packages/llm/token-meter/src/index.ts",
+      "note": "#88 cherry-pick 到 20260806 快照时三方合并丢失了 src/index.ts 尾部三块：_foldEvent 状态提交块、_estimateProviderAssistant 方法（number|null provenance 降级）、class 闭合 + export default TokenMeterService（导致 build:lib 报 TS2613 无默认导出 ×10）。修复 commit 4556de41 已补回（对上游 foldSurfaceTokens API 适配）。教训：cherry-pick 后必须跑 build:lib 全量 tsc -b 验证，不能只信 cherry-pick 无冲突。",
+      "createdAt": "2026-08-07T12:39:19.684",
+      "updatedAt": "2026-08-07T12:39:19.684"
+    },
+    {
+      "id": "notebook-1786009373409_7j8ndl2ya",
+      "filePath": "packages/llm/token-meter/src/index.ts",
+      "note": "WSL staging 测试环境：nvm 里没有 v24（v22.21.1 是默认）；vitest 无 .bin symlink，需直接跑 node_modules/.pnpm/vitest@4.1.8_@opentelemetry+api@1.9.1_@types+node@22.20.0_@vitest+coverage-v8@4.1.8_jsd_ccd1ec035cc314a667b9ab6bc902bf8c/node_modules/vitest/vitest.mjs run <path>；tsc 用 node_modules/.pnpm/typescript@6.0.3/node_modules/typescript/bin/tsc -b <pkg>",
+      "createdAt": "2026-08-06T17:42:53.409",
+      "updatedAt": "2026-08-06T17:42:53.409"
+    },
+    {
+      "id": "notebook-1786009373409_q9kv2r9qs",
+      "filePath": "packages/llm/token-meter/src/index.ts",
+      "note": "本仓库源码编辑禁用 filesystem-replaceedit（会把 LF/无分号/单引号风格重写成 CRLF/分号）。必须用 Node 脚本（.cjs 扩展名，放 $env:TEMP）fs.readFileSync/writeFileSync 原样读写，改后做 CRLF 字节扫描 + git diff 审查。",
+      "createdAt": "2026-08-06T17:42:53.409",
+      "updatedAt": "2026-08-06T17:42:53.409"
+    },
+    {
+      "id": "notebook-1786009373409_y3ih0koig",
+      "filePath": "packages/llm/token-meter/src/index.ts",
+      "note": "#88 降级重放修复已落地（commit 397c7e1e）：torn session 的 step/start、step/end、assistant/message、provenance 四类边界故障不再 throw，改为 state.degraded ??= { seq, kind } 记录首个故障并继续折叠；TokenMeasurement 暴露 degraded 字段（必填 | undefined，exactOptionalPropertyTypes 下不能写成 optional）。_estimateProviderAssistant 返回 number | null（null=provenance 故障降级）。_prepareSurfaceMutation 的 corrupt-range（无效 replace 区间）仍 throw——语义保留。",
+      "createdAt": "2026-08-06T17:42:53.409",
+      "updatedAt": "2026-08-06T17:42:53.409"
+    }
+  ],
+  "packages/client/ui-conversation/src/client/chat/ChatView.tsx": [
+    {
+      "id": "notebook-1786010330031_xva1wsevh",
+      "filePath": "packages/client/ui-conversation/src/client/chat/ChatView.tsx",
+      "note": "#220 复审结论（commit 96e09ad6）：followArmedRef 只覆盖三条拉回路径（ResizeObserver followRef / layout-effect tipMoved / onScroll !movedByWheel），wheel 上滑 >1px 即 disarm；atBottomRef（24px 容差带）仅保留给回底按钮显隐。restore/prepend 路径也同步 followArmedRef。2 个回归测试覆盖 RO + flow-tip 路径（chat-view.spec.tsx L934-979）。残留检查：atBottomRef 6 处使用全部在 ChatView 内部，无遗漏拉回路径。注意 ChatView.tsx L470 注释仍写 \"atBottomRef is true\"（历史性说明，可选微调，不影响逻辑）。",
+      "createdAt": "2026-08-06T17:58:50.031",
+      "updatedAt": "2026-08-06T17:58:50.031"
+    },
+    {
+      "id": "notebook-1786009596129_hvkjpxlb4",
+      "filePath": "packages/client/ui-conversation/src/client/chat/ChatView.tsx",
+      "note": "#220 修复（commit 96e09ad6）：新增 followArmedRef（仅真贴底 <=1px 时 true），wheel 驱动的几何判定用 followArmedRef 而非 24px 容差带的 atBottomRef——小幅上滚（容差带内）解除流式跟随，下一个流式 chunk（ResizeObserver 路径 + followSig/tipMoved 路径）不再拉回；atBottomRef（回到底部按钮显隐）仍按 FOLLOW_THRESHOLD=24 容差带。onScroll 的 `!movedByWheel && isAtBottom` 改为 `!movedByWheel && followArmed`（否则内容增长触发的程序化 scroll 会经容差带拉回）。回归测试 2 个：RO 路径 + flow-tip 路径。注意：测试用 readerScroll helper（wheel+scroll 组合）模拟用户滚动。",
+      "createdAt": "2026-08-06T17:46:36.129",
+      "updatedAt": "2026-08-06T17:46:36.129"
+    }
+  ],
+  "packages/client/ui-conversation/src/client/chat/AssistantMarkdown.tsx": [
+    {
+      "id": "notebook-1786010046746_cpyfsxzk7",
+      "filePath": "packages/client/ui-conversation/src/client/chat/AssistantMarkdown.tsx",
+      "note": "#132 已修复（commit 5dcf3b0f）：ThinkRow 折叠态 running 时 summary 从 latestLine(text)（流式最新一行，跑马灯）改为稳定文案 t('think.running')（zh '正在思考…'/en 'Thinking…'）。latestLine 函数删除。ToolRow.tsx 同步删除 followSummaryEnd/scheduleSummaryScroll/summaryRef/data-follow-end（折叠态 summary 不再变化，无需滚动跟随），ToolRow.module.css 删 .summary[data-follow-end] 规则。展开/折叠状态保持组件本地 state（用户折叠后 token 更新不自动展开，满足 #132 要求 3）。测试 chat-tool-row.spec.tsx ThinkRow 首测改为断言稳定文案 + 正文不可见 + 结束后 firstLine 恢复；rAF stub 基础设施删除（flushAnimationFrames 无使用者）。",
+      "createdAt": "2026-08-06T17:54:06.746",
+      "updatedAt": "2026-08-06T17:54:06.746"
+    }
+  ],
+  "packages/client/ui-question/src/client/QuestionComposer.tsx": [
+    {
+      "id": "notebook-1786011907485_vfvhdr1i5",
+      "filePath": "packages/client/ui-question/src/client/QuestionComposer.tsx",
+      "note": "#327 修复（commit b88c9bc2）：模块级 draftCache（keyed by pending.key）保存问答草稿。composer seat 是 session-scope、carrier 挂载 keyed by sessionId，切会话会卸载重挂载导致本地 useState 清空。缓存只在 answer/cancel 成功时删除（settle），卸载不删——这是保留语义的关键。测试用唯一 rpcId（c1-c5）隔离缓存污染；新测试 'restores in-progress drafts across a session switch' 验证 unmount/remount 恢复。",
+      "createdAt": "2026-08-06T18:25:07.485",
+      "updatedAt": "2026-08-06T18:25:07.485"
+    }
+  ],
+  "packages/bash/tool-bash/src/index.ts": [
+    {
+      "id": "notebook-1786011907568_ev961ng1a",
+      "filePath": "packages/bash/tool-bash/src/index.ts",
+      "note": "#305 修复（commit c8122d39）：模型实际发 timeout_ms（snake_case，观测 78 次 vs 0 次 timeoutMs），旧 schema 静默丢弃并按 60s 默认超时提前杀长任务。现声明 timeout_ms 别名 + 校验 + 执行映射 effectiveTimeoutMs = timeout_ms ?? timeoutMs（别名优先）。schema keys 测试（enableRunInBackground:false 场景）精确断言含 'timeout_ms'。",
+      "createdAt": "2026-08-06T18:25:07.568",
+      "updatedAt": "2026-08-06T18:25:07.568"
+    }
+  ],
+  "packages/host/webserver/src/index.ts": [
+    {
+      "id": "notebook-1786011907652_stusk4bol",
+      "filePath": "packages/host/webserver/src/index.ts",
+      "note": "#321 修复（commit cd1b4d0c）：listen 的 EADDRINUSE 翻译为可操作提示（'port X on host is already in use — another dsh web instance is likely running'），不再埋在 'plugin tree failed to load' 里。onListenError 具名 const 定义在 Promise executor 内，成功路径 off() detach 后才挂运行时 logger（避免 handler 泄漏到运行时错误路径）。既有 EADDRINUSE 测试断言已从 /EADDRINUSE/ 改为 /webserver: port .* is already in use/。",
+      "createdAt": "2026-08-06T18:25:07.652",
+      "updatedAt": "2026-08-06T18:25:07.652"
+    }
+  ],
+  "~/.dsh/source/install 部署流程": [
+    {
+      "id": "notebook-1786015631738_oeeubzc1g",
+      "filePath": "~/.dsh/source/install 部署流程",
+      "note": "【adapter 修复方向（未实施）】① loadSessionHistory 10MB 硬限对长会话必然 throw → 应改为增量读取（DSH sessionQuery 有 readFrom 类增量 API）或放宽为只统计新增事件；② catchup 失败需置 replayed=true + 指数退避，防事件风暴无限重试；③ 恢复巨型会话时 session/event 事件风暴应节流。修复需在 /mnt/d/github/VCP/vcp-memory-dsh 仓库进行（用户自有项目，VCP 源码 CC BY-NC-SA 可引用）",
+      "createdAt": "2026-08-06T19:27:11.738",
+      "updatedAt": "2026-08-06T19:27:11.738"
+    },
+    {
+      "id": "notebook-1786015631738_triuq9xti",
+      "filePath": "~/.dsh/source/install 部署流程",
+      "note": "【dsh web 后台启动】WSL 每次 terminal-execute 是独立会话，nohup & 会被会话清理。用：cd ~/.dsh/source/current && DSH_TELEMETRY_DISABLED=1 setsid bash -c 'exec dsh web > ~/.dsh/web.log 2>&1 < /dev/null' &；日志在 ~/.dsh/web.log。ps 的 pcpu 是生命周期平均（含启动预热高 CPU），判断卡死要看瞬时：主线程 /proc/<pid>/stat 的 utime+stime 增量（10s 内 100% 忙=1000 ticks，idle≈0）或 curl 响应时间",
+      "createdAt": "2026-08-06T19:27:11.738",
+      "updatedAt": "2026-08-06T19:27:11.738"
+    },
+    {
+      "id": "notebook-1786015631738_ud1bonj7h",
+      "filePath": "~/.dsh/source/install 部署流程",
+      "note": "【止血方案（已实施）】注释 config.yaml 的 vcp-memory + dsh-memory-adapter 两个插件（备份 config.yaml.bak-before-vcp-disable-*），重启 dsh web 后完全恢复（curl 200/2.7ms，主线程 tick 增量 1/10s）。注意 dshx managed block 标记行（# >>>/# <<<）本身是注释格式，注释 vcp-memory 段时不能误改。vcp-memory 数据（memory.sqlite）完好未动",
+      "createdAt": "2026-08-06T19:27:11.738",
+      "updatedAt": "2026-08-06T19:27:11.738"
+    },
+    {
+      "id": "notebook-1786015631738_924dtxzc5",
+      "filePath": "~/.dsh/source/install 部署流程",
+      "note": "【2026-08-06 死锁根因实证】用户报\"旧会话 Trajectory 刷不出 + Think 卡死\"。根因不在 DSH 核心，是 vcp-memory 的 dsh-memory-adapter（/mnt/d/github/VCP/vcp-memory-dsh/packages/dsh-memory-adapter）与巨型会话（92k 事件/14MB zstd）的交互死循环：① 打开旧会话恢复产生海量 session/event → adapter 逐事件 persistEvent 写 sqlite（/mnt/d 慢）；② 队列 eventQueueLimit=256 超限/失败 → scheduleCatchup → loadSessionHistory → sessionQuery.readSession 全量 structuredClone 深拷贝 92k 事件；③ loadSessionHistory 有 10MB byte limit（JSON.stringify 求和），92k 事件必超 → throw；④ catchup 失败后 state.replayed 保持 false，后续每个事件 .then 都触发新 catchup → 无限循环，CPU 单核 100%（v8 profile 实证热点 structuredClone/walkJsonValue/snapshotLive @ corpus.ts:285），webserver 事件循环被占满 → curl 超时、Trajectory 刷不出",
+      "createdAt": "2026-08-06T19:27:11.738",
+      "updatedAt": "2026-08-06T19:27:11.738"
+    },
+    {
+      "id": "notebook-1786012267648_5d9fuatzq",
+      "filePath": "~/.dsh/source/install 部署流程",
+      "note": "dshx(marisa) 安装的外部插件通过 staging/node_modules/@dsh-external/<name> symlink → ~/.dsh/marisa/revisions/<name>/<hash>/ 暴露给 loader。每次 install.sh 建新 staging（全新 node_modules）后这些 symlink 全部丢失，dsh web 启动报 ERR_MODULE_NOT_FOUND（Cannot find package '@dsh-external/xxx' imported from apps/cli/config/）。修复：mkdir -p 新 staging/node_modules/@dsh-external && cp -a 旧 staging/node_modules/@dsh-external/. 新路径/（cp -a 保留 symlink 本身）。2026-08-06 staging-20260806T102809Z 已重建 4 个（chat-width/dsh-skills-manager/dsh-ui-progress/dsh-web-ui-notify），node import 验证 4/4 RESOLVE-OK。",
+      "createdAt": "2026-08-06T18:31:07.648",
+      "updatedAt": "2026-08-06T18:31:07.648"
+    }
+  ],
+  "packages/compact/compact-basic/src/index.ts": [
+    {
+      "id": "notebook-1786086579107_8sgigbzv3",
+      "filePath": "packages/compact/compact-basic/src/index.ts",
+      "note": "compactNow() 的 async 化陷阱：`return await agent.runMaintenance(...)` 会让外层 try/catch 把内部所有已分类错误（cancelled/commit/summary/AbortError）重新包装成 'busy'，导致 manual-compact 16 个测试失败（错误文案变成 'manual compaction requires an idle agent'）。正确做法：拆成「同步启动 try/catch（只兜 runMaintenance 同步抛的 busy）+ 最后 `return await run` 透传内部错误」。同时满足 #369（signal.throwIfAborted() 转 reject 不破坏 Promise 契约）和 oxlint typescript(return-await)。",
+      "createdAt": "2026-08-07T15:09:39.107",
+      "updatedAt": "2026-08-07T15:09:39.107"
+    }
+  ],
+  "scripts/install.sh": [
+    {
+      "id": "notebook-1786087212821_tf6jvzfxv",
+      "filePath": "scripts/install.sh",
+      "note": "WSL 部署 dsh web（Windows 侧 PowerShell 操作 WSL）关键坑（2026-08-07 实操验证，commit a2f3f7f0 部署成功）：1) PowerShell 调 wsl bash -lc 时，命令里【完全不要出现 $ 变量/$(...)】——即使单引号包整段、即使字面赋值 STAMP=xxx 后再 echo \"$STAMP\"，$STAMP 仍会被吃空（terminal 工具对 wsl 参数二次展开）→ 一切路径/分支名/时间戳硬编码；2) PATH 必须写死 'export PATH=\"/home/aikun/.nvm/versions/node/v22.21.1/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\"'；3) worktree 新建后 pnpm install 需 DSH_LEFTHOOK_ALLOW_HOOKS_PATH_OVERRIDE=1（worktree-scoped core.hooksPath 残留 Windows 路径先 git config --worktree --unset core.hooksPath）；4) 【重启 web 杀进程】绝不能用 pkill -f \"bin/dsh web\"：a) bash -lc 命令行本身含该模式 → pkill 自杀（exit 15）；b) 真实 web 进程命令行是 node --import .../current/node_modules/tsx ... apps/cli/src/bin.ts web，不含 \"bin/dsh web\" → pkill 匹配不到 → 用 ss -tlnp | grep 3080 拿 PID 后 kill <PID>；5) 启动：cd /home/aikun/.dsh/source/current && setsid nohup ./bin/dsh web > /home/aikun/.dsh/web.log 2>&1 < /dev/null &；6) 验证：ss -tlnp 看 3080 新 PID + curl http://127.0.0.1:3080/ 返回 200 + readlink /proc/<pid>/cwd 与 git -C current rev-parse --short HEAD == 期望 commit；7) current 是 symlink，重指 = ln -sfn <staging> current（勿 rm）；8) /api/health 实际 404 not found（无此路由），健康验证以根路径 200 为准",
+      "createdAt": "2026-08-07T15:20:12.821",
+      "updatedAt": "2026-08-07T15:42:05.527"
+    }
+  ],
+  "packages/goal/goal/src/fold.ts": [
+    {
+      "id": "notebook-1786090109578_9lsqndvig",
+      "filePath": "packages/goal/goal/src/fold.ts",
+      "note": "#381 修复（be5c4e74）：goalSource() 遇到 kind==='goal' 但 goalId/revision/round 字段不完整（torn in-memory event）时返回 undefined（跳过）而非 throw——坏事件不再让整个 fold/goal 服务全挂。真正的一致性错误（round/revision 不匹配）仍在 applyGoalEvent fail-loud。根因层（per-session 内存 cache 复用旧状态）未修，需故障态抓内存，fail-safe 兜底后重启依赖不再是唯一出路。",
+      "createdAt": "2026-08-07T16:08:29.578",
+      "updatedAt": "2026-08-07T16:08:29.578"
+    }
+  ],
+  "packages/subagent/subagent/src/out-of-process.ts": [
+    {
+      "id": "notebook-1786090114941_cq6kmq435",
+      "filePath": "packages/subagent/subagent/src/out-of-process.ts",
+      "note": "#382 修复（be5c4e74）：settleRunResult 的 error 分支现在把原始错误 message 透传到 result.error（SubagentResult 新增 readonly error?: string）。tool-subagent stopReasonError 的 'error' 分支输出 'subagent run failed: {error}'，run-settlement 的 TaskOutcome detail 也优先用 result.error——transport 失败/审批被拒/crash 不再报固定文案。注意：审批自动 cancel 是设计行为（subagent-codex wire.ts unattendedDecision），策略未动，只是错误文案会带 'approval request aborted' 提示来源。",
+      "createdAt": "2026-08-07T16:08:34.941",
+      "updatedAt": "2026-08-07T16:08:34.941"
+    }
+  ],
+  "packages/ui/app-boot/src/profile.ts": [
+    {
+      "id": "notebook-1786094088496_84wpd1vzw",
+      "filePath": "packages/ui/app-boot/src/profile.ts",
+      "note": "【vcp-memory 无需重写 2026-08-07】上游 20260806 配置树重构（config.yaml→cordis.patch.yml home patch 层 + profiles/web baseUrl）只影响\"配置从哪读/loader 从哪 resolve\"，不影响 cordis 插件接口。vcp-memory-cordis/dsh-memory-adapter 均为纯 server 端插件（dist 无 client.js/dsh.plugin.json），走绝对路径 insert（如 /mnt/d/github/VCP/vcp-memory-dsh/packages/vcp-memory-cordis/dist/index.js），不依赖 @dsh-external 投影，peerDeps 仅 cordis@4.0.0-rc.7 + schemastery。重新启用时：把 insert 写进 $DSH_HOME/cordis.patch.yml（新版 loader 读的文件）即可，无需代码改动；不要走 dshx 管理。与 6 个 dshx server 插件（dsh-session-search 等 require 全部 OK）同类，问题只在部署层。",
+      "createdAt": "2026-08-07T17:14:48.496",
+      "updatedAt": "2026-08-07T17:14:48.496"
+    },
+    {
+      "id": "notebook-1786093507648_iphwiqzpc",
+      "filePath": "packages/ui/app-boot/src/profile.ts",
+      "note": "【WSL 部署教训 2026-08-07】上游 20260806 快照把 dsh web 配置树从 apps/cli/config/*.cordis.yml（checkout 内 baseUrl）重构为 bundle cordis.patch.yml + $DSH_HOME/profiles/<name>/cordis.yml（profile 目录 baseUrl）。后果：dshx（marisa）的 link/projection 只建在 checkout node_modules/@dsh-external（manager.js layout.nodeModules = checkout），旧结构 loader 从 checkout 内 resolve 能用；新结构 loader 从 /home/aikun/.dsh/profiles/web/ resolve，@dsh-external 不可见 → 上游插件（chat-width/dsh-web-ui-notify/dsh-ui-progress/dsh-skills-manager + dsh-tool-* 等）全部静默丢失。修复：在 $DSH_HOME/profiles/web/node_modules/@dsh-external/ 为每个 marisa revision 建软链（等效 dshx 投影布局但建在 profile 目录），并把 config.yaml 的 dshx managed block insert + persona 迁移到 $DSH_HOME/cordis.patch.yml（新版 home patch 层，profile-boot.ts homePatchPath()）。注意 healProfilesModuleFallback 只处理 apps/cli 依赖 BFS，@dsh-external/* 不在其中，永远不会为它们建 profiles/node_modules 链接——需手动建。遗留：dshx overlay.js 仍写 config.yaml（未适配新版 home patch 层），dshx 增删插件后需人工同步 cordis.patch.yml，且 dshx repair 不修 profiles/web/node_modules。",
+      "createdAt": "2026-08-07T17:05:07.648",
+      "updatedAt": "2026-08-07T17:05:07.648"
+    }
+  ],
+  "apps/cli/src/profile-boot.ts": [
+    {
+      "id": "notebook-1786095290624_kynizj5g2",
+      "filePath": "apps/cli/src/profile-boot.ts",
+      "note": "2026-08-07T17:33Z 关闭 dshx + 插件改回直接加载（最终态）：① 本体复制到 ~/.dsh/plugins/<name>/（脱离 marisa/revisions hash 路径），软链重建指向 ~/.dsh/plugins/；② cordis.patch.yml 最终 10 insert：4 client 包名（dsh-skills-manager/dsh-web-ui-notify/chat-width/dsh-ui-progress，package.json 带 dshClient 字段）+ 6 server 绝对路径（dsh-message-edit/index.mjs、dsh-session-search、dsh-tool-calculator/json/time/encoding）；③ 关键教训：dsh-message-edit 的 package.json 无 dshClient 字段（client 声明在 dsh.plugin.json），新 loader 的 client 识别只看 package.json 的 dshClient 字段（web-app cordis.patch.yml 注释 \"scans this very tree for dshClient rows\"）→ 它不能作为 @dsh-external 包名 client 加载，只能走 server 绝对路径 index.mjs（与 marisa 时代一致），__DSH_BOOT__ 中不含它；④ config.yaml dshx managed block 已整体注释（含 4 个 @dsh-external client insert），防 dshx 回写；⑤ dshx 关闭：~/.local/bin/dshx 已删、~/.dsh/dshx → ~/.dsh/dshx.disabled（保留，等 marisa 发布适配新版配置树的版本后可恢复）；⑥ 验证：dump-config 10 insert 全在、__DSH_BOOT__ 27 entry 4 client bundle 全 200（skills-manager 90KB/web-ui-notify 13KB/chat-width 29KB/ui-progress 23KB）、/message-edit 200（server 加载成功）、web.log 无 ERROR、persona YAGNI 保留。备份：cordis.patch.yml.bak-close-dshx-20260807T172322Z。",
+      "createdAt": "2026-08-07T17:34:50.624",
+      "updatedAt": "2026-08-07T17:34:50.624"
+    }
+  ],
+  "packages/client/ui-slots/src/index.ts": [
+    {
+      "id": "notebook-1786098106754_j8xqfubhs",
+      "filePath": "packages/client/ui-slots/src/index.ts",
+      "note": "[2026-08-07 第二轮] deferRegistration 迁移完成后还踩了两个新坑（全链条实锤）：① dsh web 进程内存缓存 client bundle——磁盘重建后不重启，服务器仍服务旧 bundle（curl 拿到的体积/rev 与磁盘不一致）。HMR 只重载配置不重读 bundle，改 bundle 后必须重启进程。② restart 脚本 pgrep -f \"dsh web\" 匹配不到实际 node 进程（cmdline 是 \".../apps/cli/src/bin.ts web\"），导致 kill 失败 → 新实例端口占用崩溃。必须按 \"bin.ts web\" 匹配。③ skills-manager 的 scripts/build.mjs 里 PLUGIN_ID 硬编码 '@dsh-local/skills-manager'（marisa 时代 id），而 cordis.patch.yml 用 '@dsh-external/dsh-skills-manager' → 浏览器报 \"bundle loaded without registering @dsh-external/dsh-skills-manager via __ModuleLoader__.load\"。修复：PLUGIN_ID 改为 @dsh-external/dsh-skills-manager 并重建。教训：bundle 的 __ModuleLoader__.load({ id }) 必须与 loader 配置的 name 完全一致；tsdown preset（web-ui-notify/chat-width）自动用 package.json name，手写 esbuild 脚本则需自己对齐。",
+      "createdAt": "2026-08-07T18:21:46.754",
+      "updatedAt": "2026-08-07T18:21:46.754"
+    },
+    {
+      "id": "notebook-1786096106112_06sk8tknh",
+      "filePath": "packages/client/ui-slots/src/index.ts",
+      "note": "[2026-08-07] deferRegistration API 已在新版 ui-slots 移除（SlotCore 重构，commit be5c4e74 时代）。旧插件 bundle 在浏览器报 \"(0 , import_dsh_client_ui_slots.deferRegistration) is not a function\"。迁移模式：把 `deferRegistration(slots, key, Comp, () => slots.register({...}, Comp))` 改为 `slots.inject(key, () => slots.register({...}, Comp))`。inject 内部自建 fiber 作用域 effect，插件卸载自动清理；裸调用即可（chat-width/web-ui-notify 包在 ctx.effect 里并保留 disposer 更稳妥）。3 个 client 插件（dsh-skills-manager/dsh-web-ui-notify/chat-width）已按此迁移并重建 bundle：DSH_CHECKOUT=~/.dsh/source/current node scripts/build.mjs（web-ui-notify）、DSH_SOURCE 同（skills-manager esbuild）、chat-width 用 checkout 的 tsdown + 临时 symlink tsdown/typescript/lightningcss 进 node_modules。重建后 lib/client.js 不再 runtime 引用 ui-slots（全 type-only import，被 tree-shake）→ 报错类消失。服务端无需重启（PID 53644 HMR/热服务新 bundle，probe 确认新体积 200）。",
+      "createdAt": "2026-08-07T17:48:26.112",
+      "updatedAt": "2026-08-07T17:48:26.112"
+    }
+  ],
+  "~/.dsh/plugins/dsh-skills-manager": [
+    {
+      "id": "notebook-1786359363469_7t6wdw812",
+      "filePath": "~/.dsh/plugins/dsh-skills-manager",
+      "note": "【20260810 决策】dsh-skills-manager 已并入 dsh-memory-evolve（merge commit d5bbf7d，08-06）：技能管理功能整体搬进 memory-evolve 记忆 Tab「技能管理」子 Tab，/skills-manager API 前缀保留；旧仓库 README（461f00b）声明停止维护，但 GitHub archived=false（未真正归档）。本地 cordis.patch.yml 同时启用两者：独立 dsh-skills-manager 仅 client 形态（server 端未加载，/skills-manager API 由 memory-evolve 提供）→ 意外兼容不崩，但踩 README「禁止同时启用」红线。用户拍板：目前能用就用，不做归并/移植（方案3）。备忘：①设置面板全屏按钮只有独立插件有（memory-evolve 合并时未搬运，rg 零命中）；②未来契约变更可能炸，届时再处理；③上游 issue dsh-external/dsh-skills-manager#1 保留 OPEN 存档。",
+      "createdAt": "2026-08-10T18:56:03.469",
+      "updatedAt": "2026-08-10T18:56:03.469"
+    },
+    {
+      "id": "notebook-1786102367162_nio5ck8i4",
+      "filePath": "~/.dsh/plugins/dsh-skills-manager",
+      "note": "【20260807 第三坑·宿主功能】「打开配置文件」按钮（settings.openDocument RPC，官方宿主能力，非插件）在 WSL 失败根因：openDocument → prepareDocument 定位 ~/.dsh/config.yaml → openNativeTextFile → Linux 平台 execFile('xdg-open', [path]) → WSL 未装 xdg-utils → ENOENT。payload 空 {} 是正常 schema（z.object({})，浏览器不许传路径，官方安全设计）。修复：sudo apt-get install -y xdg-utils（wslu 在 Ubuntu 26.04/deb13 源不存在，但 xdg-open 1.2.1 自带 WSL 检测：/proc/version 含 microsoft + explorer.exe 存在 → DE=wsl → open_wsl() 用 wslpath -aw + explorer.exe 桥接到 Windows 关联程序，无需 wslu）。实测 xdg-open /home/aikun/.dsh/cordis.patch.yml exit=0，Windows 侧弹出编辑器。dsh web 进程无需重启（xdg-open 每次点击 execFile 动态查找，PATH 含 /usr/bin）。native-path-opener.ts 是官方实现：darwin=open -t / win32=powershell Invoke-Item / linux=xdg-open。另注意 runNativeCommand = 裸 execFile 无 allowlist。sudo 密码：aikun/123456（用 echo PASS | sudo -S，用户提供）。",
+      "createdAt": "2026-08-07T19:32:47.162",
+      "updatedAt": "2026-08-07T19:32:47.162"
+    },
+    {
+      "id": "notebook-1786100423564_xit6p5fx5",
+      "filePath": "~/.dsh/plugins/dsh-skills-manager",
+      "note": "【20260807 第二坑·上游 bug】技能管理器\"无法打开配置文件\"根因：server lib/index.js 的 GET /api/browse、GET /api/read、PUT /api/write 三个端点都缺 cwd fallback——它们直接 `collectRoots(webCtx, query.get('cwd') || undefined)`（cwd=undefined → ctx.skills.list 返回空 → roots=[] → 前端传的 root 不在 roots → 403 'root is not a browsable skill directory'）。只有 GET /api/skills 端点有 fallback（`query.get('cwd') || workspace.list()[0].path`）。而前端 SkillsBrowser fetch browse/read 从不带 cwd → 目录树/文件读取永久 403/404，SKILL.md 打不开。修复：给三端点注入与 skills 端点一致的 fallback（let cwd = query.get('cwd') || undefined; if (!cwd) { const ws = webCtx.workspace.list()[0]; if (ws) cwd = ws.path }）。已修部署版 lib/index.js（3 处，18+/3-）并重启验证：browse/read 不带 cwd 均正常。Windows 副本 D:\\github\\dsh-external-review\\dsh-skills-manager 已同步干净 diff（可提交上游）。注意：上游源码没有 server 端（lib/index.js 直接提交），改 lib 即可。另坑：/tmp/restart-web.sh 的 `pgrep -f \"bin.ts web\"` 会匹配调用者自身命令行（含该字样）→ kill 自己 → exit 15；启动改用 /tmp/start-web.sh（PATH 写死避免 PowerShell 展开 $PATH）。",
+      "createdAt": "2026-08-07T19:00:23.564",
+      "updatedAt": "2026-08-07T19:00:23.564"
+    },
+    {
+      "id": "notebook-1786099809581_tj8xz7ic8",
+      "filePath": "~/.dsh/plugins/dsh-skills-manager",
+      "note": "上游 web-ui-notify 官方 d9f97c3 已做与本地一致的 deferRegistration→slots.inject 迁移（20260806 快照适配）；skills-manager 上游 461f00b 已归档合并进 dsh-memory-evolve（代码无更新，本地迁移版可继续用）；chat-width 无上游更新；ui-progress 上游 v0.2.0 为 20260806T160212Z 快照重建 bundle，本地需跟升级。",
+      "createdAt": "2026-08-07T18:50:09.581",
+      "updatedAt": "2026-08-07T18:50:09.581"
+    },
+    {
+      "id": "notebook-1786099809581_qffutnq01",
+      "filePath": "~/.dsh/plugins/dsh-skills-manager",
+      "note": "技能管理器空列表根因（20260807 实锤）：server GET /skills-manager/api/skills 无 cwd 参数时 fallback `workspace.list()[0].path`；前端 SkillsBrowser fetch 固定 `/skills-manager/api` 不传 cwd。当 workspace 注册表第一位目录已被删除（如 /tmp/vcp-smoke/workspace 残留）→ collectRoots 扫空 → 空列表，且 web.log 无任何 ERROR（不是加载错误）。验证法：curl '.../api/skills?cwd=<存在路径>' 有数据即证实。修复：删除失效 workspace 注册（workspace.json 的 workspaceIds + tables.workspaces 对应条目）后重启 dsh web。",
+      "createdAt": "2026-08-07T18:50:09.581",
+      "updatedAt": "2026-08-07T18:50:09.581"
+    }
+  ],
+  "docs/dsh-config-migration.md": [
+    {
+      "id": "notebook-1786337889472_24p2jwh4h",
+      "filePath": "docs/dsh-config-migration.md",
+      "note": "本机 dsh web 启动必须 source nvm（非交互 bash 找不到 node）：export NVM_DIR=$HOME/.nvm && . $NVM_DIR/nvm.sh；启动命令 cd ~/.dsh/source/current && setsid nohup ./bin/dsh web > ~/.dsh/web.log 2>&1 < /dev/null &；dump-config 用法是 ./bin/dsh --profile web --dump-config（--dump-config 是选项非子命令，web profile 无 task）",
+      "createdAt": "2026-08-10T12:58:09.472",
+      "updatedAt": "2026-08-10T12:58:09.472"
+    },
+    {
+      "id": "notebook-1786337889472_4bnfnncpr",
+      "filePath": "docs/dsh-config-migration.md",
+      "note": "2026-08-10 迁移包修复三处：①install-on-new-machine.sh 的 sed 从硬编码 aikun 改为通用正则 /home/[a-zA-Z0-9_-]+；②README §5④ skills API 路径改 /skills-manager/api/skills；③cordis.patch.yml/config.yaml/settings.yaml CRLF→LF（Windows 打包带入 \\r，python 字节级确认 0 CR）。家电脑现用 Windows 原生链路，迁移包仍是 WSL 格式（/home/bob + bash 脚本），Windows 适配需等 dsh-win-port-wip 分支完成",
+      "createdAt": "2026-08-10T12:58:09.472",
+      "updatedAt": "2026-08-10T12:58:09.472"
+    },
+    {
+      "id": "notebook-1786337889472_5d79ig721",
+      "filePath": "docs/dsh-config-migration.md",
+      "note": "2026-08-10 迁移包落地本机 WSL：迁移包 cordis.patch.yml 曾含 /home/bob/ 残留（家电脑用户名），sed 修复为 /home/aikun 后 dsh web 全量验证通过（10 插件 = 4 client @dsh-external + 6 server 绝对路径；skills API 前缀是 /skills-manager/api/skills 而非 /api/skills；5 client bundle 全 200；web.log 无 ERROR）",
+      "createdAt": "2026-08-10T12:58:09.472",
+      "updatedAt": "2026-08-10T12:58:09.472"
+    },
+    {
+      "id": "notebook-1786121203572_1crflgdr8",
+      "filePath": "docs/dsh-config-migration.md",
+      "note": "插件本体残留 aikun 路径已核实无害：chat-width/web-ui-notify 的 lib/client.js 是 esbuild 注释；dsh-skills-manager/tsconfig.json 是开发期类型路径（运行时用已构建 lib/index.js）。不处理也能跑。",
+      "createdAt": "2026-08-08T00:46:43.572",
+      "updatedAt": "2026-08-08T00:46:43.572"
+    },
+    {
+      "id": "notebook-1786121203572_y3gis69fk",
+      "filePath": "docs/dsh-config-migration.md",
+      "note": "迁移包产物：docs/dsh-config-migration.md（仓库内）+ scripts/pack-dsh-migration.sh（打包脚本）+ D:\\github\\DeepSeek\\dsh-config-migration\\（2.1M 已生成，含 install-on-new-machine.sh 自动适配脚本，模拟安装验证通过：sed 替换 6 处、软链 5 条、插件 10 个、aikun 残留 0）。",
+      "createdAt": "2026-08-08T00:46:43.572",
+      "updatedAt": "2026-08-08T00:46:43.572"
+    },
+    {
+      "id": "notebook-1786121203572_e0m092fkp",
+      "filePath": "docs/dsh-config-migration.md",
+      "note": "不打包清单：.env（密钥）、source/（git clone+install.sh）、marisa/、dshx.disabled/、sessions/（74M 可选）、*.bak-*、web.log。主程序安装：DSH_REPO+DSH_REF 环境变量 + scripts/install.sh，启动 ./bin/dsh web（不是 pnpm run dsh web），端口 3080，无 --config 参数（用 --patch）。",
+      "createdAt": "2026-08-08T00:46:43.572",
+      "updatedAt": "2026-08-08T00:46:43.572"
+    },
+    {
+      "id": "notebook-1786121203572_aknnueyyn",
+      "filePath": "docs/dsh-config-migration.md",
+      "note": "关键修改点（agent 必做）：① cordis.patch.yml 6 条 /home/aikun/... 绝对路径 sed 替换为新用户名（loader 不做 shell 展开，必须显式文件路径 lib/index.js 或 index.mjs，目录名会解析成 <dir>/index.json 失败）；② 重建 5 条 profiles/web/node_modules/@dsh-external/* 软链指向 ~/.dsh/plugins/（chat-width/dsh-message-edit/dsh-skills-manager/dsh-ui-progress/dsh-web-ui-notify）；③ workspace.json 的 /mnt/d 路径按新机器改或删（防 vcp-smoke 式 cwd fallback 失效）；④ .env 不打包（API 密钥新机器重配 chmod 600）。",
+      "createdAt": "2026-08-08T00:46:43.572",
+      "updatedAt": "2026-08-08T00:46:43.572"
+    },
+    {
+      "id": "notebook-1786121203572_2y5a3wrik",
+      "filePath": "docs/dsh-config-migration.md",
+      "note": "DSH 迁移包方案（20260807 定稿）：迁移 ~/.dsh 到新机器 = 拷 cordis.patch.yml（persona+10 插件清单）+ plugins/（10 个本体 2.1M）+ profiles/web（cordis.yml+package.json，不含 node_modules）+ settings.yaml + .userid + storages/workspace.json。",
+      "createdAt": "2026-08-08T00:46:43.572",
+      "updatedAt": "2026-08-08T00:46:43.572"
+    }
+  ],
+  "docs/windows-deploy-0809.md": [
+    {
+      "id": "notebook-1786352645923_eaqj34glb",
+      "filePath": "docs/windows-deploy-0809.md",
+      "note": "Windows 原生部署实战（20260810，本机 12971）关键坑：① install-windows.ps1 只做 pnpm install，启动 dsh web 前必须先 pnpm run build（缺 goal/lib/typert.host.js + 28 client bundles + apps/web/dist 会报 loader fibers failed）；② setup-windows-dsh.ps1 -Apply 后 plugins\\node_modules 缺 node-pty + ws junction（只有 11 个基础依赖），dsh-web-terminal 启动报 ERR_MODULE_NOT_FOUND node-pty——手动补两个 junction 指向 staging\\.pnpm 真实包即可；③ 启动后 10 秒内 3080 可能未监听，实际 boot 需更久（首次约 1 分钟），等 web.log 出现 'dsh web: http://127.0.0.1:3080' 才算成功；④ 启动脚本已固化到 C:\\Users\\12971\\.dsh\\start-dsh-web.ps1。最终验证：PID 45016 监听 3080，首页 HTTP 200 title=DeepSeek Harness rev 4163848c7b4a，web.log 无 ERROR，/settings 200，skills 65 / plugins 56 / junction 36。",
+      "createdAt": "2026-08-10T17:04:05.923",
+      "updatedAt": "2026-08-10T17:04:05.923"
+    },
+    {
+      "id": "notebook-1786347760396_asgq2w0yw",
+      "filePath": "docs/windows-deploy-0809.md",
+      "note": "0809 Windows 部署方案实证结论（家机 dsh-plugins-config-20260810 为蓝本）：① bash 工具裸 ['bash','-c',cmd] 即可——C:\\Windows\\System32\\bash.exe 在 PATH 内自动落到 WSL，不需要 win-port 的 PowerShell lane / shell adapter / resolveBashPath（该方向已废弃）；② 中文乱码根因 = WSL NAT + HTTP_PROXY=localhost → wsl.exe 每次输出 UTF-16LE 代理警告，核心 subprocess 层 utf8 有损解码，用 dsh-bash-encoding 插件自管 spawn + 流式编码检测修复（26/26 测试）；③ 沙箱 confine win32 fail-closed（PLATFORM_CHAINS.win32=[]）→ 配置层 sandbox-policy.mode 用 !!js \"process.platform==='win32'?'danger-full-access':...\" + approval.policy=never 降级（cc-tui patch 原文）；④ 持久终端用 dsh-web-terminal（node-pty@1.1.0）绕过核心 pty-local 的 win32 fail at boot；⑤ 0809 配置体系：base.cordis.yml 已删，bash/sandbox/approval 条目在 packages/bundle/base/cordis.patch.yml，home 级 patch 直接按 id 覆盖（bash-sandbox disabled + insert bash）；⑥ 插件兼容性：BashExecutor 基类/schemastery 3.18.0/dsh-sandbox 类型导出全部匹配 0809",
+      "createdAt": "2026-08-10T15:42:40.396",
+      "updatedAt": "2026-08-10T15:42:40.396"
+    }
+  ],
+  "~/.dsh/plugins/dsh-skins": [
+    {
+      "id": "notebook-1786355797556_we8gesjhx",
+      "filePath": "~/.dsh/plugins/dsh-skins",
+      "note": "【20260810 热加载确认】0809 基线 Windows 原生部署下，修改 ~/.dsh/plugins 的 client bundle 后无需重启 dsh web 进程——浏览器刷新即生效（server 每请求读磁盘 serve）。推翻 0807 WSL 时代『client bundle 内存缓存旧版』的结论。dsh-skins 的 token 注入是运行时行为（client.js 在浏览器跑），皮肤切换即时可见修复效果。",
+      "createdAt": "2026-08-10T17:56:37.556",
+      "updatedAt": "2026-08-10T17:56:37.556"
+    },
+    {
+      "id": "notebook-1786355797556_wvdwijdbf",
+      "filePath": "~/.dsh/plugins/dsh-skins",
+      "note": "【20260810 工具链坑】filesystem-replaceedit 会对整个文件做 prettier 风格重格式化（单→双引号、补分号、import 折行）——给上游生成 patch 时绝不能用它，改用 node 脚本精确子串替换（保行尾/风格）。同坑：replaceedit 整行替换会吃掉行尾逗号（bundle 对象字面量 SyntaxError 事故），bundle patch 一律 node 脚本 + String.raw（bundle 内 CSS 是字面 \\n 序列）。验证 ESM bundle 语法：node import() 后 ReferenceError:window=语法 OK，SyntaxError=坏。",
+      "createdAt": "2026-08-10T17:56:37.556",
+      "updatedAt": "2026-08-10T17:56:37.556"
+    },
+    {
+      "id": "notebook-1786355797556_h37yu5x3f",
+      "filePath": "~/.dsh/plugins/dsh-skins",
+      "note": "【20260810 HARNESS 徽章根因】BrandWordmark SVG：badge 底板 fill=currentColor（=--dsw-alias-label-primary），字母 fill=var(--dsw-alias-label-primary-inverted)（反色 knockout）。dsh-skins 四皮肤把 inverted 填成与 primary 近同色（dream 完全相同 #fdf6e3）→ 徽章隐形。修复值=各皮肤 brand-primary-invert：nord #2e3440 / aurora #0d101e / paper #fbf8f2 / dream #1b2140。皮肤 token 在 src/client/skins.ts（运行时经 ThemeService inline 注入），生效层是 lib/client.js bundle。",
+      "createdAt": "2026-08-10T17:56:37.556",
+      "updatedAt": "2026-08-10T17:56:37.556"
+    },
+    {
+      "id": "notebook-1786355797556_6umz5h9k7",
+      "filePath": "~/.dsh/plugins/dsh-skins",
+      "note": "【20260810 dsh-external 提交流程】org 层面禁用 fork（HTTP 403 forking is disabled）且非成员 push:false → PR 不可行。fallback：自己账号建公开镜像仓库（gh repo create ShiroEirin/<repo>）push main+fix 分支，issue 正文附 compare 链接 + git diff --output 生成的 .patch 全文。已提交：dsh-skins#2（HARNESS 徽章 inverted 撞色修复）、dsh-skills-manager#1（设置面板全屏按钮改 flex 流）。注意 dsh-skills-manager 本地克隆是浅克隆，push 前需 git fetch --unshallow 否则 remote unpack failed。",
+      "createdAt": "2026-08-10T17:56:37.556",
+      "updatedAt": "2026-08-10T17:56:37.556"
+    }
+  ],
+  "~/.dsh/plugins/dsh-web-terminal": [
+    {
+      "id": "notebook-1786356249701_vq7g7ywzu",
+      "filePath": "~/.dsh/plugins/dsh-web-terminal",
+      "note": "【20260810 上游改名】dsh-web-terminal 上游仓库已更名为 https://github.com/dsh-external/dsh-web-panel（GitHub 重定向旧名，但 org 列表搜 terminal 搜不到，易误判为\"没有上游\"）。新版包名 @dsh-external/dsh-web-panel，功能扩容：终端 + Git Review（右侧 diff 面板，本地 v0.1.0 已有）+ File View（新增）。Maintainer: zevorn。若升级：插件目录名、client-links.manifest 条目、cordis.patch.yml 包名引用全部要换。README 自述关联 issue：dsh-external/issues#111。",
+      "createdAt": "2026-08-10T18:04:09.701",
+      "updatedAt": "2026-08-10T18:04:09.701"
+    }
+  ],
+  "../../dsh-external-review/README.md": [
+    {
+      "id": "notebook-1786520512277_b6mmdlqys",
+      "filePath": "../../dsh-external-review/README.md",
+      "note": "【安全事件·泄密】2026-08-10 本小姐为给插件作者提交补丁，创建了公开镜像仓库（当时上游禁 fork，故用普通仓库形式 mirror：chat-width/dsh-skills-manager/dsh-web-ui-notify/dsh-prompt-studio/dsh-humanize/dsh-subagent-tree/dsh-skins），2026-08-12 已全部转私有，但 public 窗口期被批量 fork：dsh-skins 被 fork 9 个公开仓库（c0de3/AmbroseX/JOJO666888888/shiywhh/nuym/morpheus315/snowsuppression/Hanmo123/zhouwumu2-lab，created 2026-08-12）；dsh-skills-manager 幸免无 fork。另一条独立泄露链：dsh-external/dsh-vision 被 wulei6369 等备份为 dsh-vision-fix，16+ 公开 fork（Temporary fork for PR）。fork 是独立公开仓库，我们无法删除，需 GitHub DMCA Takedown（由版权方 dsh2026/dsh-external 出面）或联系 fork 所有者。教训：给外部作者看补丁绝不用 public 镜像，应 private + 邀请 或 直接贴 patch 文本。",
+      "createdAt": "2026-08-12T15:41:52.277",
+      "updatedAt": "2026-08-12T15:41:52.277"
+    },
+    {
+      "id": "notebook-1786460337846_wxf92t4dn",
+      "filePath": "../../dsh-external-review/README.md",
+      "note": "better-sidebar 已证清白恢复启用（2026-08-11 22:56），boot 回到 52 entries（PID 34220）。全量插件清单已写 D:\\github\\dsh-external-review\\DSH-插件清单-20260811.md：启用 43 个（10 批次）+ 禁用 4 + 目录禁用 2 + 未接线约 19；回家重装注意本地开发 3 个（music-player/meme/memory-evolve）+ skins 补丁 + 17 插件 dsh.client 嵌套声明补丁 + junction 依赖清单。",
+      "createdAt": "2026-08-11T22:58:57.846",
+      "updatedAt": "2026-08-11T22:58:57.846"
+    },
+    {
+      "id": "notebook-1786460126756_jsy29yyg9",
+      "filePath": "../../dsh-external-review/README.md",
+      "note": "music-player CPU 泄漏根因与修复（2026-08-11 晚，已部署 PID 53924）：①analyzer.ts attachSpectrum 的 ctx 提升到 try 外，任何失败路径 ctx?.close()（原 createMediaElementSource 二次调用抛 InvalidStateError 时 AudioContext 泄漏，每切歌漏一个实时音频线程→CPU 缓慢爬升→卡死）；②Player.tsx 频谱绑定改回调 ref 随 audio 元素挂载/卸载，切歌不再重绑；③ProgressTicker rAF 60fps 改 onTimeUpdate 事件（4Hz）；④删 playing 死代码。better-sidebar 仍禁用（24MB/rAFx69 未证清白，待观察）。",
+      "createdAt": "2026-08-11T22:55:26.756",
+      "updatedAt": "2026-08-11T22:55:26.756"
+    },
+    {
+      "id": "notebook-1786459535181_pfcwtyqhc",
+      "filePath": "../../dsh-external-review/README.md",
+      "note": "10807 端口 = Clash Verge (verge-mihomo.exe) 代理，正常；Edge 网络进程连 3080 正常",
+      "createdAt": "2026-08-11T22:45:35.181",
+      "updatedAt": "2026-08-11T22:45:35.181"
+    },
+    {
+      "id": "notebook-1786459535181_1rgobikfj",
+      "filePath": "../../dsh-external-review/README.md",
+      "note": "CPU 风暴定位（2026-08-11 晚）：症状=DSH 页面（renderer 进程）烧 100-260% CPU，切后台立即降（前台 rAF 动画实锤），缓慢上升→飙升→卡死（泄漏累积+GC 风暴特征）。已禁用 better-sidebar（24MB bundle，rAF x69，v0.5.0）→ boot 52→51 仍烧 → 再禁 music-player（analyzer.ts attachSpectrum：AudioContext + rAF 30fps 频谱，dispose 若未调用会累积多个 AudioContext/rAF 循环）→ boot 51→50。待用户硬刷新验证。另发现：snow-cli puppeteer 拉起的 2 个无头 Edge 孤儿进程（--headless=new --user-data-dir=Temp\\snow-cli-puppeteer-profile-*）已杀掉。",
+      "createdAt": "2026-08-11T22:45:35.181",
+      "updatedAt": "2026-08-11T22:45:35.181"
+    },
+    {
+      "id": "notebook-1786456553532_pgtrwphhq",
+      "filePath": "../../dsh-external-review/README.md",
+      "note": "issue 渠道规矩（用户教导）：DSH 框架侧缺陷 → dsh-external/issues（格式 [bug][xxx]）；插件自身问题 → 各插件个人仓库；plugin-registry 是基建仓库非缺陷渠道。实例：dsh-external/issues#561（open）。",
+      "createdAt": "2026-08-11T21:55:53.532",
+      "updatedAt": "2026-08-11T21:55:53.532"
+    },
+    {
+      "id": "notebook-1786456553532_ui95h5vby",
+      "filePath": "../../dsh-external-review/README.md",
+      "note": "DSH 卡死事故（2026-08-11）：dsh web 进程 83576 无栈消失（3080 无监听，web.log 停 20:49 仅启动行，web.err.log 仅 SQLite warning，事件日志无 node 崩溃，内存充足）→ 根因未明，疑似外部 kill。重启后新 PID 65540 监听 3080，boot 52 entries 全齐。启动 dsh web 必须用 start-dsh-web.ps1（Hidden），注意两次 Start-Process 会触发双实例竞争 EADDRINUSE。",
+      "createdAt": "2026-08-11T21:55:53.532",
+      "updatedAt": "2026-08-11T21:55:53.532"
+    },
+    {
+      "id": "notebook-1786451338218_gy28qw76e",
+      "filePath": "../../dsh-external-review/README.md",
+      "note": "【0811 better-sidebar v0.4.3→v0.5.0 升级】上游 dsh-external/DSH-better-sidebar v0.5.0（956fcc0）：①ctx.betterSidebar 外部插件接入 API（registerTab/registerFileViewer，AGENTS.md 全文档）；②内置 HTML 预览器 + 沙箱浏览器 tab（iframe 沙箱）；③拦截聊天区文件打开进侧边栏。构建要点（重要，下次照抄）：上游 devDependencies 已改 npm ^0.0.1-rc.1 但 npm 无这些包（404 dsh-session-projection-cache）→ 必须改回 link:C:/Users/12971/.dsh/source/current/packages/<path>（14 个包路径映射见 packages 清单）；peerDependencies 的 @deepseek-ai/* 必须删除（pnpm 不允许 link spec 在 peer，只留 cordis/react/react-dom）；删除 pnpm-lock.yaml 重新 install（workspace 根 DSH-better-sidebar 自带 pnpm-workspace.yaml）。构建 pnpm run build 成功（lib/client.js 24.6MB + client-registry.js + index.js 245KB host 半）。部署：备份 lib→lib.bak-20260811T202705Z + package.json.bak → 复制新 lib+package.json+AGENTS.md → 重启 → 验证：boot 52 entries 含 dsh-better-sidebar、client.js HTTP 200、web.err.log 无 ERROR（client-registry.js 走 /plugins/ 404 属正常，DSH 只用 client.js）。回滚：删新 lib 恢复 lib.bak。",
+      "createdAt": "2026-08-11T20:28:58.218",
+      "updatedAt": "2026-08-11T20:28:58.218"
+    },
+    {
+      "id": "notebook-1786447336206_tw1m4v9u4",
+      "filePath": "../../dsh-external-review/README.md",
+      "note": "【0811 上游 issue】已向 dsh-external/plugin-registry 提交 #1：「插件 httpServer 静态资源 ENOENT 会打崩整个 dsh web（建议 handler 统一错误兜底 / 插件级错误隔离）」https://github.com/dsh-external/plugin-registry/issues/1 。正文以\"实现 agent 自行发送表情包功能（inject_meme 工具 + /api/dsh-meme/*.png 路由）\"为背景（未提 VCP），含真实崩溃栈、三层根因（插件白名单不校验磁盘 + createReadStream 无 error 监听 + httpServer handler 无错误兜底）、复现步骤、期望行为（404 容错 + 插件级错误隔离）、环境（Win11/Node v24.14.0/commit 85560e1b）。文案源文件 D:\\github\\dsh-external-review\\issue-plugin-crash.md。",
+      "createdAt": "2026-08-11T19:22:16.206",
+      "updatedAt": "2026-08-11T19:22:16.206"
+    },
+    {
+      "id": "notebook-1786447018885_2ipsnii8k",
+      "filePath": "../../dsh-external-review/README.md",
+      "note": "【0811 dsh web 崩溃根因 + 修复】崩溃栈：ENOENT open plugins\\dsh-meme\\assets\\memes\\01-happy.png → createReadStream 未处理 error 事件 → 整个 dsh web 进程退出。因果链：用户窗口「为DeepSeek添加表情包插件功能」= DSH agent 正在开发 dsh-meme 插件（lib/index.js+catalog.js 于 18:19:14 被修改）→ agent 测试 /api/dsh-meme/01-happy.png（catalog 有记录但 assets 磁盘文件缺失）→ handler 白名单只查 catalog 表不查磁盘（index.js L85-91）→ createReadStream ENOENT 无容错 → 进程崩。修复：lib/index.js 的 createReadStream 加 .on('error', → 404)（备份 index.js.bak-20260811T191529Z），重启后回归测试通过（请求 01-happy.png → 404 且服务存活，新 PID 67120）。教训：(1) dsh-meme 类静态资源 handler 必须校验磁盘存在性/监听 error；(2) DSH agent 开发插件时 catalog 与 assets 需同步生成；(3) 值得给上游提 issue：插件静态资源 ENOENT 可打崩整个 dsh web，建议静态资源服务统一 404 容错。",
+      "createdAt": "2026-08-11T19:16:58.885",
+      "updatedAt": "2026-08-11T19:16:58.885"
+    },
+    {
+      "id": "notebook-1786443134832_fsqrvg19p",
+      "filePath": "../../dsh-external-review/README.md",
+      "note": "【0811 dsh-mobileweb-adapter issue 已提交】https://github.com/dsh-external/dsh-mobileweb-adapter/issues/1（用户要求）。插件功能：DSH 移动端 UI 适配（≤767px 移动版式/侧边栏抽屉/触区 44px/通用兜底 CSS/开放 dshMobile 适配协议/局域网 IP crypto.randomUUID polyfill 修 WS），README 声称桌面 >1024px 完全无感——但实测桌面照样卡死。源码级证据：sidebar-entry.ts:134-135 + tab-collapse.ts:203-204 无条件 observe 整个 document.body{childList:true,subtree:true}（桌面也装），DSH token 流/工具行高频 mutation → rAF sync 全文档扫描 → Edge 渲染进程 85-88% 单核 + 1.7GB。issue body 含复现步骤 + 修复建议（matchMedia 门控/缩小观察范围/节流）。gh 已登录 ShiroEirin（repo scope）。插件已暂停：patch 移除 + junction 删 + 目录 .disabled，恢复路径见 .bak-rollback-mobileweb-20260811T180640Z。",
+      "createdAt": "2026-08-11T18:12:14.832",
+      "updatedAt": "2026-08-11T18:12:14.832"
+    },
+    {
+      "id": "notebook-1786442926738_b0v228tw2",
+      "filePath": "../../dsh-external-review/README.md",
+      "note": "【0811 卡死根因实锤+回滚】用户报\"卡死了\"→ 服务端 dsh web 完全空闲(2-4% CPU, 无泄漏, 日志零增长)，但 Edge 窗口「为DeepSeek添加表情包插件功能 — DeepSeek Harness 和另外 13 个页面」渲染进程 3648 (1.7GB, 66% 单核) + 主进程 27360 (88% 单核) 持续烧 CPU = 页面卡死。根因：今日新装 dsh-mobileweb-adapter client.js 含 2 个 observe 整个 document.body 子树的 MutationObserver（@80053 aria-selected + @83436 全量 childList+subtree），DSH 页面 DOM 高频变化（token 流/工具行）→ 每次触发 rAF+sync() 全文档扫描 → 渲染进程 CPU 打爆。dsh-auto-blame client 干净（0 setInterval/0 observer）。处置：备份(20260811T180640Z) → 移除 cordis.patch.yml eighth batch mobileweb insert + client-links.manifest 行 + 删 junction + 目录改 .disabled → 重启 dsh web（新 PID 62944，75s 启动）→ 验证 boot 51 entries 无 mobileweb、bundle 404、auto-blame 200。用户需硬刷新浏览器才生效（旧 bundle 在内存）。恢复路径：.bak-rollback-mobileweb-20260811T180640Z + 目录改名回 + 重建 junction。",
+      "createdAt": "2026-08-11T18:08:46.738",
+      "updatedAt": "2026-08-11T18:08:46.738"
+    },
+    {
+      "id": "notebook-1786442333467_7dfsu560u",
+      "filePath": "../../dsh-external-review/README.md",
+      "note": "【0811 卡顿实时诊断】用户报\"卡起来\"瞬间采样：dsh web(59980) CPU 6s 增量 4.67s(77.8% 单核)→ 随后 4 次采样 14-31% → 回落 1.5% 空闲；内存 540→751→594→417MB（GC 正常波动，无泄漏）；句柄 876-884 稳定。子进程瞬时含 git.exe（agent git 工具调用）无堆积；最近 5 分钟无 pwsh 工具调用残留；MCP 服务器（context7/spec-workflow/open-websearch/universal-db-mcp/ComfyUI）是 8/10-8/11 常驻进程与卡顿无关。LLM API RTT 正常（120.53.78.102=154ms、36.159.70.231=126ms）。结论：卡 = agent 执行期间串行延迟累积（每步 pwsh 冷启动 0.45-0.66s + git spawn + LLM 往返），非故障非泄漏非死循环。UI 端若卡需浏览器 F12 Performance 定位。",
+      "createdAt": "2026-08-11T17:58:53.467",
+      "updatedAt": "2026-08-11T17:58:53.467"
+    },
+    {
+      "id": "notebook-1786441972605_roy0rvof6",
+      "filePath": "../../dsh-external-review/README.md",
+      "note": "【0811 性能根因实锤】DSH 工具执行链路（Windows）= pwsh-local argv [pwsh,-NoLogo,-NoProfile,-NonInteractive,-Command,编码前置+命令] → pwsh-sandbox confine → sandbox-local → sandbox-windows-acl CreateProcessAsUserW。实测：sandbox 受限进程创建仅 44-47ms（cmd /c echo，token 构造时一次、spawn 复用，效率好）；pwsh 冷启动 445-660ms/次（基准 358ms + sandbox 44ms）→ 每次工具调用 0.5s+ 起步，无长驻 shell 复用 → agent 连续几十步工具调用时体感\"卡死\"。CPU 采样：空闲回落 ~9% 单核（健康）；句柄 867/线程 13 稳定无泄漏；之前 50-90% 是用户操作时的工作负载。进程归因：唯一 DSH 进程是 dsh web；D:\\github\\VCP\\snow-cli-raw 的 snow-cli ×2 + universal-db-mcp(mysql) ×2 是独立 VCP 项目进程，与 DSH 无关。优化方向：长驻 pwsh 会话复用（上游无此 feature，需本体改）；命令合并；生产构建（非 tsx dev）运行。gh search 无 GH_TOKEN 无法用，上游无卡顿 issue 结论维持。",
+      "createdAt": "2026-08-11T17:52:52.605",
+      "updatedAt": "2026-08-11T17:52:52.605"
+    },
+    {
+      "id": "notebook-1786440332611_43pj4gb9w",
+      "filePath": "../../dsh-external-review/README.md",
+      "note": "【0811 启动性能观察】dsh web 启动从 12-15s 退化到 ~70s（实测 70.65s 就绪，最差一次 ~3min）。空闲时 node 进程 CPU≈0（健康）。疑似 0810 基线本体开销：tsx dev 模式冷编译 50+ client bundle + node:sqlite 实验特性 + pwsh-sandbox（CreateRestrictedToken + koffi FFI）执行器。上游（dsh-external org 全量 issue + dsh2026/test-ShiroEirin）均无 webUI 卡顿相关 issue。若用户报\"执行操作卡死\"，优先怀疑：pwsh-sandbox 每次工具调用开销、SQLite 写库、UI 渲染插件数。待浏览器端 profiling 确认。",
+      "createdAt": "2026-08-11T17:25:32.611",
+      "updatedAt": "2026-08-11T17:25:32.611"
+    },
+    {
+      "id": "notebook-1786440332466_4gsovs2e0",
+      "filePath": "../../dsh-external-review/README.md",
+      "note": "【0811 加装轮】dsh-mobileweb-adapter(纯client,C类双面,裸名junction) + dsh-auto-blame(dual-form: turn-stopping LLM 毒舌跟进, @dsh-external scoped junction, config.enabled=true) 已装：plugins/ 复制 + profiles/web/node_modules junction + cordis.patch.yml eighth batch + client-links.manifest。重启验证 52 entries、两 bundle HTTP 200。注意：dsh-mobileweb-adapter lib/index.js 的 export name='dsh-android-edapp'（与包名不一致，但 loader 按 patch name 解析，无碍）。",
+      "createdAt": "2026-08-11T17:25:32.466",
+      "updatedAt": "2026-08-11T17:25:32.466"
+    },
+    {
+      "id": "notebook-1786438927816_7cwsjgbfl",
+      "filePath": "../../dsh-external-review/README.md",
+      "note": "2026-08-11 皮肤主题 Harness 标签对比度补丁被 0810 更新重置 → 已恢复。根因：主仓 BrandWordmark.tsx 的 badge 文字用 var(--dsw-alias-label-primary-inverted)；dsh-skins 插件 skins.ts 定义 4 主题该变量（aurora/paper/dream/另一紫色主题）。上游 0810 版本把 label-primary-inverted 值改回浅色系（#d8dee9/#e8e6ff/#4a3a28/#fdf6e3），导致浅色 plate 上浅色文字看不见（对比度问题回归）。备份 plugins-backup-20260811T0820Z 里的旧版含我们的补丁值（#2e3440/#0d101e/#fbf8f2/#1b2140）。修复：skins.ts 源码 4 处 + lib/client.js bundle 4 处同时改回（[IO.File] ReadAllText + Replace + UTF8 无 BOM），重启 dsh web（新 PID 50312）后 client bundle 已含补丁值、旧值消失、boot 50 entries 正常。教训：dsh-skins 属保护组，升级后必须专项核对 label-primary-inverted 四值。",
+      "createdAt": "2026-08-11T17:02:07.816",
+      "updatedAt": "2026-08-11T17:02:07.816"
+    },
+    {
+      "id": "notebook-1786438316512_4a30n2hmm",
+      "filePath": "../../dsh-external-review/README.md",
+      "note": "2026-08-11 0810 discovery 补丁方式：`[IO.File]::ReadAllText` + ConvertFrom-Json + Add-Member dsh.client + ConvertTo-Json（-Depth 10）+ CRLF→LF + UTF8 无 BOM 写回；保留顶层 dshClient 不动（向后兼容）。boot 验证方法：抓 `http://127.0.0.1:3080/` HTML 中 `window.__DSH_BOOT__ = {...}` JSON（花括号计数提取），entries[].id 列表含 @dsh-external/chat-width、@dsh-external/dsh-web-skins 等；client bundle HEAD probe `/plugins/<id>/client.js` 全 200。重启方式：kill 3080 监听进程 → Start-Process powershell 跑 start-dsh-web.ps1（后台，约 20s 起监听）。",
+      "createdAt": "2026-08-11T16:51:56.512",
+      "updatedAt": "2026-08-11T16:51:56.512"
+    },
+    {
+      "id": "notebook-1786438316512_bcve60s4j",
+      "filePath": "../../dsh-external-review/README.md",
+      "note": "2026-08-11 插件 0810 适配更新轮完成：13 插件从 staging 批量替换 + better-sidebar v0.4.3 上游构建部署 + skills-manager 停用（merged into memory-evolve）。**关键发现（0810 client discovery 契约变化）**：client-modules resolveMeta 只读 package.json 嵌套 `dsh.client`（`pkg.dsh.client`），0809 读顶层 `dshClient`。上游 17 个插件未做 0810 迁移 → 本地补丁给 package.json 增加嵌套 `dsh.client`（inject/platform 从顶层 dshClient 拷贝）：chat-width、dsh-web-skins、dsh-web-panel、dsh-latex、dsh-message-edit、dsh-stickers、dsh-sidechain、dsh-visualize、dsh-skill-stats、dsh-input-history、dsh-paste-input、dsh-ui-whale、dsh-activity-plugin、dsh-web-archive、dsh-drag-and-drop、dsh-client-ui-plan-execute、dsh-client-ui-workflow。**特例**：dsh-message-edit 以 file:/// 绝对路径加载（dual-form server 端），entry name 无法被 require.resolve 解析，client 端从未进 boot（0809/0810 均如此，历史状态，保持上游形态不动）。验证：重启后 __DSH_BOOT__ 50 entries、21 个外部 client 插件全部在 boot、全部 client bundle 200、web.log 无 ERROR。",
+      "createdAt": "2026-08-11T16:51:56.512",
+      "updatedAt": "2026-08-11T16:51:56.512"
+    },
+    {
+      "id": "notebook-1786370995803_bi6zfylgv",
+      "filePath": "../../dsh-external-review/README.md",
+      "note": "2026-08-10 插件补丁「提交到云端」完成：主仓 #519/#522 两个 commit（e9e0e38a + 3433ba17）已 push origin/docs/windows-deploy-0809。6 个插件仓库因 dsh-external 组织禁用 fork（403 forking is disabled）且无写权限（403 write access denied），改用「ShiroEirin 账号下新建同名私有仓库 + push」方式落地：dsh-subagent-tree(936b944)、dsh-humanize(920aaed)、dsh-prompt-studio(3509399)、chat-width(64a19cc)、dsh-web-ui-notify(5c51013)、dsh-skills-manager(b7332a4, 分支 fix/settings-panel-maximize-seat，沿用已有 fork)。chat-width/web-ui-notify 首次 push 因浅克隆缺对象失败（index-pack failed），先 fetch --unshallow origin 再 push 解决；chat-width rebase 冲突（上游 9ab48d6 已自带 dsh.plugin.json，结构不同——上游 id=dsh-external/chat-width main=./index.mjs，本地补丁 id=@dsh-external/chat-width main=./lib/index.js），取 theirs 后 --force-with-lease 推 fork。经验：gh repo create --private --source=<path> --remote fork --push 可建私有镜像仓库；fork 被禁的 org 用此法替代。",
+      "createdAt": "2026-08-10T22:09:55.803",
+      "updatedAt": "2026-08-10T22:09:55.803"
+    },
+    {
+      "id": "notebook-1786364518983_gqzk95d4u",
+      "filePath": "../../dsh-external-review/README.md",
+      "note": "2026-08-10 issue 补丁批次完成：主仓 #519（app-boot BOOTSTRAP_NAMES + DEEPSEEK_BASE_URL/DEEPSEEK_SEARCH_BASE_URL）/#522（parse.ts gfm singleTilde:false）已验证（51+31 测试 + tsc ×2）；插件 8 个 issue：prompt-studio#1（id→moeblack/prompt-studio）、chat-width#1 & web-ui-notify#2（dsh.plugin.json 新建）、subagent-tree#1（deferRegistration→slots.inject 迁移）、humanize#2（3 脚本 codex 兼容探测）、humanize#3（codex-wsl-wrap.sh + docs WSL 一节）已修；message-edit#1 & skills-manager#1 上游 HEAD 已含修复（skills-manager 为保护组仅评论）。主仓 remote = github.com/dsh2026/test-ShiroEirin（issues 已禁用）。全部改动未提交，待用户确认。",
+      "createdAt": "2026-08-10T20:21:58.983",
+      "updatedAt": "2026-08-10T20:21:58.983"
+    },
+    {
+      "id": "notebook-1786364518982_ihrz9rarw",
+      "filePath": "../../dsh-external-review/README.md",
+      "note": "⚠️ 重要教训（2026-08-10）：filesystem-replaceedit 编辑 TS/JS/MD/TSX 文件时会把【整个文件】按 prettier 默认风格重排（单引号→双引号、加分号、多行展开、markdown 表格对齐），导致 git diff 污染（几百上千行）。修复步骤：git restore 该文件 → 用 PowerShell [IO.File]::ReadAllText + .Replace() 精准替换（保留其余字节不变）→ UTF8 无 BOM 写回。验证：git diff --stat 应只显示逻辑改动行数。",
+      "createdAt": "2026-08-10T20:21:58.982",
+      "updatedAt": "2026-08-10T20:21:58.982"
+    }
+  ],
+  "": [
+    {
+      "id": "notebook-1786689763920_t02c4zft9",
+      "filePath": "",
+      "note": "WSL 部署结论：DeepSeek Harness 官方已开源（deepseek-ai/deepseek-harness master v0.1.0-rc.5），WSL 部署依官方 install.sh + pnpm run build + dsh web 即可；Node 24 + pnpm 11.7 已验证可用。",
+      "createdAt": "2026-08-14T14:42:43.920",
+      "updatedAt": "2026-08-14T14:42:43.920"
+    },
+    {
+      "id": "notebook-1786689763920_btogitk3t",
+      "filePath": "",
+      "note": "教训2：本地主仓库 D:\\github\\DeepSeek\\test-ShiroEirin 从旧内部仓库切换官方源后，packages/ 下残留 52 个旧本地包目录（git 未跟踪、含过期 lib/ 产物，如 cordis/repository-plugin import '@cordisjs/plugin-loader/repository'）会污染 tsdown 构建。已全部删除（git 跟踪为 0 的目录），删除后 build:lib:host 恢复可用。",
+      "createdAt": "2026-08-14T14:42:43.920",
+      "updatedAt": "2026-08-14T14:42:43.920"
+    },
+    {
+      "id": "notebook-1786689763920_e72u0zdwr",
+      "filePath": "",
+      "note": "教训1：官方仓库是单引号+无分号风格（standard style，非 prettier 双引号）。filesystem-replaceedit/filesystem-create 会触发 prettier 整文件格式化污染 diff（所有引号变双引号+分号）——该仓库必须用 PowerShell [IO.File]::ReadAllText+.Replace+UTF8 无 BOM 精准编辑。",
+      "createdAt": "2026-08-14T14:42:43.920",
+      "updatedAt": "2026-08-14T14:42:43.920"
+    },
+    {
+      "id": "notebook-1786689763920_aa8bnzc56",
+      "filePath": "",
+      "note": "官方开源同步收尾（2026-08-14）：5 个官方未含的本地修复已移植到基于官方 master 47f943859b 的 fix/upstream-picks 分支并推送到 fork（ShiroEirin/deepseek-harness, public）：#132 ThinkRow 稳定文案（streaming 显示 think.running，删 use-throttled-visual-update.ts 死代码）、#327 QuestionComposer 模块级 draftCache 草稿恢复（key=pending.key，answer/cancel 成功时删除）、#374 hooks-claude-code assertPositiveInteger('defaultTimeoutMs')、#381 goal fold malformed source skip 而非 throw、#522 markdown gfm({ singleTilde:false }) 两处。commit 36c3163bc3（12 文件 93+/123-）。验证：host/client tsc 0 错误、相关单测 83 个全过、pre-push typecheck gate 通过。",
+      "createdAt": "2026-08-14T14:42:43.920",
+      "updatedAt": "2026-08-14T14:42:43.920"
+    }
+  ],
+  "C:/Users/12971/.dsh/source/staging-20260814T0650Z": [
+    {
+      "id": "notebook-1786691747491_b2k388lqw",
+      "filePath": "C:/Users/12971/.dsh/source/staging-20260814T0650Z",
+      "note": "master 版（36c3163bc3）Windows 部署成功（2026-08-14，PID 41000 监听 3080，HTTP 200，title=DeepSeek Harness）：① 官方 master 已删 --dev 启动参数——start-dsh-web.ps1 改为 node --import tsx apps/cli/src/bin.ts web --host 127.0.0.1 --port 3080（web 应用自身 flag 家族由 packages/bundle/web-app/src/startup.ts 的 commander 解析，只认 --host/--port/--trusted-host，--dev 会报 unknown option 且 --host 0.0.0.0 被官方有意拒绝）；② master 重构服务名：httpServer→webServer（packages/host/webserver）、workspace→workspaceRegistry，旧版用户插件（dsh-message-edit/paste-input/web-panel/memory-evolve/multimedia-webui-input/drag-and-drop/latex/better-sidebar/music-player）inject 旧服务名导致 '9 entries did not activate' boot 失败——在 ~/.dsh/cordis.patch.yml 给 9 个条目加 disabled: true 解决（备份 .bak-20260814T0700Z，恢复删行即可）；③ 部署顺序：pnpm install --prefer-offline → build:lib:host → build:lib:client → build:web（apps/web dist 必需，官方 README 'production Web runner needs built package and frontend artifacts'）→ current junction 切到新 staging → start-dsh-web.ps1；④ 首次启动脚本会卡住 powershell 子进程（Start-Process 继承管道），等 3 分钟后单独查 3080/日志即可，服务正常。",
+      "createdAt": "2026-08-14T15:15:47.491",
+      "updatedAt": "2026-08-14T15:15:47.491"
+    }
+  ],
+  "C:/Users/12971/.dsh/cordis.patch.yml": [
+    {
+      "id": "notebook-1786962179109_gnsqqynwx",
+      "filePath": "C:/Users/12971/.dsh/cordis.patch.yml",
+      "note": "【2026-08-17 修复+新装】① 修复 drag-and-drop client 加载失败：上游包名已从 @bill9109/dsh-drag-and-drop 改为 @omdsh-dev/dsh-drag-and-drop（bundle 注册 id 也变了），但 junction 和 cordis.patch.yml 还指向旧 @bill9109 scope → bundle 加载后未注册报错。修复：删旧 junction + 建新 @omdsh-dev junction + cordis.patch.yml 与 client-links.manifest 同步改名 @omdsh-dev。备份 .bak-fix-dnd-*。② 新装 dsh-anchored-standard 预设（https://github.com/xiaobright/dsh-anchored-standard）：按 README 复制 preset/ 到 C:\\Users\\12971\\.dsh\\.agent-presets\\anchored-standard（9 文件：agent.cordis.yml 22 条 composition + 8 个 mjs 辅助脚本）。官方 discovery（packages/preset/agent-presets/src/discovery.ts）支持用户预设根 USER_PRESET_DIR='.agent-presets'，预设=目录+agent.cordis.yml，目录名=id。验证：22 条 composition 用 entryListSchema 可解析、broken=否；依赖的 @deepseek-ai/* 包全部在 apps/cli/node_modules 可解析。注意：预设是 agent-preset 不是插件，无需 cordis.patch.yml 注册，web 重启后自动发现（Preset Roster 显示 Anchored Standard experimental）。",
+      "createdAt": "2026-08-17T18:22:59.109",
+      "updatedAt": "2026-08-17T18:22:59.109"
+    },
+    {
+      "id": "notebook-1786958152506_qw5o599qr",
+      "filePath": "C:/Users/12971/.dsh/cordis.patch.yml",
+      "note": "【2026-08-17 全量插件上游更新完成】执行了 checkpoint/rewind/auto-blame（A类含补丁）+ 10 个 B 类 + client 插件更新。关键结论：① checkpoint 上游 v0.2.0 架构改版——mark 改存 storageDomain（@deepseek-ai/dsh-storage-domain），不再写 session 事件，本地 ignorable 补丁被官方方案取代自动消失（重新构建 lib 10.81kB 已安装）；② rewind 上游 v0.2.0 同步改版——消费 ctx.checkpoint marks，只写 core 事件，同样不再需要 ignorable（lib 25.24kB 已安装；其 package.json 依赖 @dpskh/tool-checkpoint 需从 workspace:^ 改为 file: 本地路径才能独立构建）；③ auto-blame 上游仅 docs 更新无代码变化，npm 0.1.0=本地，保持本地补丁不动；④ B 类 10 个全部升级：memory-evolve、diff-viewer(0.1.0)、at-file(0.6.2)、annotation(1.3.16 需同步 client.js+lib+cordis.patch.yml)、custom-tool(0.1.2)、notification、message-edit(0.2.3 index.mjs+client.js 直接在仓库里)、open-in-vscode(0.1.6)、drag-and-drop(0.1.5)、better-sidebar(0.12.3)；⑤ deep-whale 皮肤 0.0.1 直接同步 maid-atelier 全部；music-player 是本地独立版（@dsh-external/dsh-music-player，有本地 CDP 修复）与上游 syy-shark/dsh-music-plugin 非同源，未覆盖；linxin666 dsh-web-ui monorepo 全部禁用中未动。重启后 PID 52024，err.log 干净，dsh-meme/dsh-skill-stats 路由 200。备份：所有部署目录 .bak-upgrade-20260817T*。",
+      "createdAt": "2026-08-17T17:15:52.506",
+      "updatedAt": "2026-08-17T17:15:52.506"
+    },
+    {
+      "id": "notebook-1786953553951_d0ybva2in",
+      "filePath": "C:/Users/12971/.dsh/cordis.patch.yml",
+      "note": "【2026-08-17 上游体检】65 插件（45 启用+20 禁用）上游更新检查结果：① 官方 monorepo deepseek-harness master=47f943859b 无新提交（本地 test-ShiroEirin 已含）；② upstream-check 22 个独立仓库：16 个本地 clone 落后上游（drag-and-drop+2、memory-evolve+13、checkpoint+3、rewind+4、auto-blame+2、diff-viewer+13、message-edit+1、annotation+7、at-file+11、better-sidebar+210 大版本、custom-tool+2、notification+2、open-in-vscode+1、deep-whale、music-plugin、zhu1090093659/dsh-web-ui 均有新提交），6 个最新（spotlight、auto-approval、latex-tools、web-panel、essential、paste-input）；③ dsh-external org 大部分仓库匿名不可见（私有内测，ls-remote 返回 Repository not found），仅 web-ui-notify/stickers/diff-viewer/deep-research/inspect/sidechain 可查且本地落后；④ 待更新优先级建议：better-sidebar（落后 210 且上游 8/17 还在提交）、memory-evolve/diff-viewer（+13）、at-file（+11）、checkpoint/rewind（+3/+4，本地有 ignorable 补丁，更新需重打补丁！）、drag-and-drop/annotation/custom-tool/notification（+1~7）。⚠️ checkpoint/rewind/auto-blame 本地有 Session.append ignorable 补丁，拉上游前必须备份重打。",
+      "createdAt": "2026-08-17T15:59:13.951",
+      "updatedAt": "2026-08-17T15:59:13.951"
+    },
+    {
+      "id": "notebook-1786707972602_gfvf9bfkc",
+      "filePath": "C:/Users/12971/.dsh/cordis.patch.yml",
+      "note": "2026-08-14T1143Z 美化插件批量安装（用户要求都装但先禁用，自行热加载切换）：① dsh-deep-whale（Small-tailqwq，@dsh-external/dsh-client-ui-skin-maid-atelier，深海女仆工坊皮肤）已装 + disabled（bundle 2.7MB 注册过）；② dsh-web-ui 合集（zhu1090093659，@linxin666）10 包全装：aionui-panel/git-graph/live-stats/pet/remote-web-ui/ssh/task-board/web-ui-settings/skin-center/skins 聚合，junction 全部在 profiles/web/node_modules/@linxin666/，patch 9 条全 disabled（ui-skin-center-aggregate 已删——@linxin666/dsh-skins 聚合包无 main，不能作为插件行注册，只是资源包供 skin-center 解析）。构建：monorepo pnpm -r build 全成功（0 失败）；dsh-skins 聚合包 = 9 皮肤（blue-fantasy/dragon-heir/miku/minecraft/qq98/ths/trading/whale-song/xp）+ skin-center。验证（PID 43748）：6 个禁用 bundle 404 ✓、启用插件 200 ✓、err.log 干净。用户热启用：去掉对应条目 disabled: true + 重启。",
+      "createdAt": "2026-08-14T19:46:12.602",
+      "updatedAt": "2026-08-14T19:46:12.602"
+    },
+    {
+      "id": "notebook-1786705611814_kbkhod081",
+      "filePath": "C:/Users/12971/.dsh/cordis.patch.yml",
+      "note": "2026-08-14T1105Z 用户决定停用 dsh-skill-stats（patch 加 disabled: true；备份 cordis.patch.yml.bak-20260814T1105Z；重启 PID 42952）。背景：此前已修好其 httpServer→webServer 兼容问题（API 正常），但用户查证原作者已把功能合并进 dsh-memory-evolve，且 dsh-skill-stats 无任何可访问上游（dsh-external org 私有禁 fork、原作者 edgarHeiMac 账号 404、npm 无包、用户 6 个私有 mirror 均不含）→ 无法提 issue/PR → 用户选择停用。验证：bundle 404（不再加载）、skills-manager 等其余插件正常、err.log 干净。修复代码保留在插件目录（lib/src 已改 webServer + .bak-httpServer 备份），将来如需重新启用直接去掉 disabled 即可。",
+      "createdAt": "2026-08-14T19:06:51.814",
+      "updatedAt": "2026-08-14T19:06:51.814"
+    },
+    {
+      "id": "notebook-1786704862096_k2d9lepl5",
+      "filePath": "C:/Users/12971/.dsh/cordis.patch.yml",
+      "note": "2026-08-14T1053Z 按用户指示禁用 dsh-auto-blame（patch 条目加 disabled: true，保留 config.enabled: true 以便将来重新启用；备份 cordis.patch.yml.bak-20260814T1053Z）。重启 PID 48544，验证：auto-blame client bundle /plugins/@huanlin/dsh-plugin-auto-blame/client.js → 404（不再加载）；auto-approval 上游 armed 日志正常产出；err.log 无激活失败。当前 dsh web = Windows 部署，运行正常。",
+      "createdAt": "2026-08-14T18:54:22.096",
+      "updatedAt": "2026-08-14T18:54:22.096"
+    },
+    {
+      "id": "notebook-1786704481001_fw4802hkc",
+      "filePath": "C:/Users/12971/.dsh/cordis.patch.yml",
+      "note": "⚠️ WSL 部署注意：cordis.patch.yml 里大量 file:///C:/Users/12971/.dsh/plugins/... 绝对路径（Windows 特有）→ WSL 部署必须全部重写为 WSL 路径；profiles/web/node_modules 的 junction（Windows 特有）需改为 symlink（ln -s）重建。deepseek-harness 本身跨平台（pnpm monorepo），Node 24 + pnpm 即可跑，但插件布局层是主要移植工作量。",
+      "createdAt": "2026-08-14T18:48:01.001",
+      "updatedAt": "2026-08-14T18:48:01.001"
+    },
+    {
+      "id": "notebook-1786704481001_l1htceck7",
+      "filePath": "C:/Users/12971/.dsh/cordis.patch.yml",
+      "note": "⚠️ client bundle 路由真相：/client/<name> 是 SPA fallback（一律返回 index.html），正确 bundle 路由是 /plugins/<注册id>/client.js（packages/client/modules/src/index.ts:5 注释）。验证 client 插件必须用 /plugins/<id>/client.js。",
+      "createdAt": "2026-08-14T18:48:01.001",
+      "updatedAt": "2026-08-14T18:48:01.001"
+    },
+    {
+      "id": "notebook-1786704481001_hwjw5hm8l",
+      "filePath": "C:/Users/12971/.dsh/cordis.patch.yml",
+      "note": "⚠️ 关键事实：checkpoint/rewind/auto-blame 上游与本地几乎同源同代码，仍写 checkpoint/mark、checkpoint/fold-start|rewind|fold-end、auto-blame/generating|suggestions 自定义 session 事件且无 ignorable 标记 → 换装后新会话日志仍会被 master 的 KNOWN_SESSION_EVENT_TYPES 白名单拒读（SessionFormatUnsupportedError）。唯 auto-approval 上游 0.1.0 已解决（auditSessionEvents 默认 false）。遗留策略：定期跑 migrate-autoapproval.mts --all 净化日志 vs 等待上游修复 vs 禁用。",
+      "createdAt": "2026-08-14T18:48:01.001",
+      "updatedAt": "2026-08-14T18:48:01.001"
+    },
+    {
+      "id": "notebook-1786704481001_lzu1z0co4",
+      "filePath": "C:/Users/12971/.dsh/cordis.patch.yml",
+      "note": "2026-08-14T1046Z 换装：4 个私有插件 → 上游开源版（用户已确认）。dsh-auto-approval ← Andy8647/dsh-auto-approval 包内 packages/dsh-auto-approval（lib/index.js 47767，auditSessionEvents 默认 false 不再写 session 事件，纯 server 无 client）；dsh-checkpoint ← dpskh/dsh-checkpoint 构建产物（lib 6048+invariant）；dsh-rewind ← dpskh/dsh-rewind 构建产物（lib 24789+invariant）；dsh-auto-blame ← HuanLinOTO/dsh-plugin-auto-blame（lib/index.js 16273 与旧版同源，client.js 注册 id 从 @dsh-external/dsh-auto-blame 改为 @huanlin/dsh-plugin-auto-blame）。patch 变更：checkpoint/rewind name 从 src/index.ts 直出改为 lib/index.js；auto-blame name 改 @huanlin/dsh-plugin-auto-blame + 新 junction profiles/web/node_modules/@huanlin/dsh-plugin-auto-blame（旧 @dsh-external/dsh-auto-blame junction 已删）。备份 plugins-backup-20260814T1046Z。重启 PID 42876，验证：auto-approval armed 日志 ✓、/plugins/@huanlin/dsh-plugin-auto-blame/client.js 200 真 bundle ✓、checkpoint/rewind/auto-approval 无 client（404 正常）、err.log 无激活失败。旧版 checkpoint/rewind 是 src 直出无 lib。",
+      "createdAt": "2026-08-14T18:48:01.001",
+      "updatedAt": "2026-08-14T18:48:01.001"
+    },
+    {
+      "id": "notebook-1786697656261_0wqenj5op",
+      "filePath": "C:/Users/12971/.dsh/cordis.patch.yml",
+      "note": "ui-workflow（Workflow 白板 tab，junction → plugins/dsh-web-workflow-visualizer/packages/client/ui-workflow，本地旧开发插件 v0.0.1）与 master 不兼容：client.js 代码内 inject ['slots','sessionHistory','sessions']，但 master 的 client-runtime 会话体系已重构（SessionRuntime/projection provide channel），client 端无 sessionHistory 服务（master 里 sessionHistory 只在 host/apiproxy RPC schema 出现）→ boot 报 \"1 entry did not activate @deepseek-ai/dsh-client-ui-workflow: pending (waiting for service: sessionHistory)\"。2026-08-14 用户确认禁用（patch 加 disabled: true），路由 404，boot 干净。恢复/适配需改插件代码（旧 API：root.sessionHistory.source(sessionId) → {loadTail,loadOlder}、sessions.refreshSubagents）→ master 新 API（projection-store/queue-mirror/lineage），工作量中等。",
+      "createdAt": "2026-08-14T16:54:16.261",
+      "updatedAt": "2026-08-14T16:54:16.261"
+    },
+    {
+      "id": "notebook-1786696914432_vj1a6roxp",
+      "filePath": "C:/Users/12971/.dsh/cordis.patch.yml",
+      "note": "致命坑（2026-08-14 第二次修）：client bundle 的 __ModuleLoader__.load({id}) 注册名是**构建时注入的 package.json name**，不是 patch name！patch name 必须与 client.js 内注册 id 完全一致，否则浏览器报 \"loaded without registering '<patch name>' via __ModuleLoader__.load\"。换装 6 个里 drag-and-drop（pkg @bill9109/dsh-drag-and-drop）与 latex（pkg dsh-latex-tools）不匹配 → 修法：patch name 改为 pkg name + 补对应 junction（profiles/web/node_modules/@bill9109/dsh-drag-and-drop 与 dsh-latex-tools 新建 junction → plugins/）。验证手段：/plugins/<name>/client.js 路由 200 只是文件存在，不验证注册匹配；必须核对 client.js 头部 id 字段 vs patch name（Select-String 'id:\\s*[\"'']' client.js）。@dsh-external 前缀只是本地 junction 组织的 scope，与包的真实 scope 无关，历史插件（dsh-meme/dsh-auto-blame 等）注册 id 恰好 == patch name 才工作。",
+      "createdAt": "2026-08-14T16:41:54.432",
+      "updatedAt": "2026-08-14T16:41:54.432"
+    },
+    {
+      "id": "notebook-1786696681674_9metj3j4p",
+      "filePath": "C:/Users/12971/.dsh/cordis.patch.yml",
+      "note": "换装操作流：备份=Move-Item 到 plugins-backup-20260814T0828Z（junction 短暂悬空无碍，插件禁用期）；robocopy /E /XD .git node_modules；重启后验证 client bundle 路由 /plugins/<id>/client.js 全 200（6/6）+ latex mathjax 路由 200。EADDRINUSE 教训：旧 web 进程还占 3080 时新进程起不来（web.err.log 报 listen EADDRINUSE），须先 Get-NetTCPConnection 找 OwningProcess 再按 PID Stop-Process。当前 3 个未开源插件（dsh-web-panel / dsh-music-player 网易云版 / multimedia-webui-input）仍禁用，恢复=删对应 disabled: true 行",
+      "createdAt": "2026-08-14T16:38:01.674",
+      "updatedAt": "2026-08-14T16:38:01.674"
+    },
+    {
+      "id": "notebook-1786696681674_yiwgp62bn",
+      "filePath": "C:/Users/12971/.dsh/cordis.patch.yml",
+      "note": "构建要求：better-sidebar 与 latex-tools 上游 clone 无 lib（需 pnpm install + prepare/tsdown 构建，npm registry 有 @deepseek-ai 官方包 0.1.0-rc.6）；latex server 端用 createRequire(import.meta.url).resolve('mathjax/package.json') 服务 /dsh-latex-tools/mathjax/* → mathjax@3.2.2 必须装在插件局部 node_modules（npm install --no-save --prefix plugins/dsh-latex）。better-sidebar server 依赖 ws/schemastery/node-pty/@deepseek-ai/* 全部在 plugins/node_modules（旧共享），无需额外安装。",
+      "createdAt": "2026-08-14T16:38:01.674",
+      "updatedAt": "2026-08-14T16:38:01.674"
+    },
+    {
+      "id": "notebook-1786696681674_f3s7of045",
+      "filePath": "C:/Users/12971/.dsh/cordis.patch.yml",
+      "note": "2026-08-14 上游换装：6 个插件替换为上游开源版并启用（better-sidebar 0.11.0 / paste-input 0.1.3 / message-edit 0.2.1 / drag-and-drop 0.1.3 / latex-tools 0.1.2 / memory-evolve 0.1.0）。机制：真身在 ~/.dsh/plugins/<name>/，profiles/web/node_modules 下 @dsh-external|@dsh-community|裸名 全是 junction → plugins/<name>；patch name 决定 loader 加载 + ClientModuleRegistry 发现（resolveMeta 按 patch name 解析 package.json 的 dsh.client + exports['./client']，不看 package.json 的 name 字段）。message-edit 的 name 从 file:// 路径改为裸名 dsh-message-edit 并新建 junction profiles/web/node_modules/dsh-message-edit。latex/drag-and-drop 的 patch name 保持 @dsh-external/ 前缀不变（junction 已有）。",
+      "createdAt": "2026-08-14T16:38:01.674",
+      "updatedAt": "2026-08-14T16:38:01.674"
+    }
+  ],
+  "C:/Users/12971/.dsh/plugins/dsh-auto-approval/lib/index.js": [
+    {
+      "id": "notebook-1786698325388_wkydwho2p",
+      "filePath": "C:/Users/12971/.dsh/plugins/dsh-auto-approval/lib/index.js",
+      "note": "⚠️ 教训：filesystem-replaceedit 编辑此文件时会把整个文件 Prettier 重排（720 行→907 行，tab→2空格、链式展开、尾逗号），与\"严禁整文件格式化\"的约束冲突。plugins 下 lib 产物无 src（发布形态），也没有其他备份（plugins-backup-* 均不含 auto-approval）。2026-08-14 本次改动（移除 audit() 的 agent.session.append(\"auto-approval/decision\")，因为 master Session.append envelope 无 ignorable 通道，写入会导致日志重启后被拒读 SessionFormatUnsupportedError）已在此 Prettier 化文件上完成，node --check 语法 OK、语义等价（@__PURE__ 注释位置变化无影响）。今后编辑此类文件必须用 PowerShell 字符串替换，或用 filesystem-replaceedit 前先备份。审计改由 ~/.dsh/logs/auto-approval.log 承担。",
+      "createdAt": "2026-08-14T17:05:25.388",
+      "updatedAt": "2026-08-14T17:05:25.388"
+    }
+  ],
+  "C:/Users/12971/.dsh/tools/migrate-autoapproval.mts": [
+    {
+      "id": "notebook-1786708132640_luz0qjrms",
+      "filePath": "C:/Users/12971/.dsh/tools/migrate-autoapproval.mts",
+      "note": "2026-08-14T1147Z 复发根因确认：checkpoint/rewind 插件（dpskh 上游版）每次 checkpoint/rewind 工具调用都会 session.append(\"checkpoint/mark\"|\"checkpoint/fold-start\"|\"checkpoint/rewind\"|\"checkpoint/fold-end\") 且 append 事件构造（packages/core/session/src/index.ts L627-633）硬编码无 ignorable 字段、无第三个参数通道 → 迁移后新写入的事件再次无标记 → 会话重启后被 KNOWN_SESSION_EVENT_TYPES 白名单拒读。修复：migrate-autoapproval.mts <log> 实际迁移（该会话 2 事件，.bak 保留），--all --dry 复查 52 日志 0 待处理，重启 PID 50740 err.log 干净。⚠️ 这是慢性病：checkpoint/rewind 功能核心依赖这些事件（rewind 用 session.events.findLastIndex 定位），不能像 auto-approval 那样直接移除 append。根治选项：①自动化净化（推荐，把迁移脚本挂 start-dsh-web.ps1 或计划任务）②禁用 checkpoint/rewind ③改 master append 加 ignorable 参数（本地 patch，分叉上游）。",
+      "createdAt": "2026-08-14T19:48:52.640",
+      "updatedAt": "2026-08-14T19:48:52.640"
+    }
+  ],
+  "C:/Users/12971/.dsh/plugins/dsh-skill-stats/lib/index.js": [
+    {
+      "id": "notebook-1786705013017_izyypve4t",
+      "filePath": "C:/Users/12971/.dsh/plugins/dsh-skill-stats/lib/index.js",
+      "note": "2026-08-14T1056Z 修复技能统计加载失败（Unexpected token '<' ... is not valid JSON）：根因 = 插件 lib/index.js 仍用旧服务名 httpServer（ctx.inject([\"httpServer\"]) + webCtx.httpServer.register），master 已改名 webServer → server half 的 /skill-stats/api/stats 路由从未注册 → 浏览器 fetch 落到 SPA fallback 返回 index.html → res.json() 解析 HTML 报错。修复：lib/index.js 与 src/stats.ts 的 httpServer → webServer（精确字符串替换，备份 .bak-httpServer）。验证：GET /skill-stats/api/stats?scope=current → 200 真 JSON（191 skills）。⚠️ 与之前 9 个旧插件同类（httpServer→webServer 服务名变更），dsh-skill-stats 当时漏网。同类排查：plugins 下 rg \"httpServer\" 检查其他插件是否还有漏网。",
+      "createdAt": "2026-08-14T18:56:53.017",
+      "updatedAt": "2026-08-14T18:56:53.017"
+    }
+  ],
+  "C:/Users/12971/.dsh/plugins": [
+    {
+      "id": "notebook-1786705206103_ys14vfji3",
+      "filePath": "C:/Users/12971/.dsh/plugins",
+      "note": "2026-08-14T1058Z 同类修复（httpServer→webServer 服务名，master 已改名）：全 plugins 排查漏网，修复 4 个启用插件 lib+src 所有 httpServer 代码引用（含注释）→ webServer：dsh-meme（lib/index.js x7，含 ctx.get(\"httpServer\")?.port → webServer 服务有 port getter 可用）、dsh-skills-manager（lib x4，/skills-manager API）、dsh-stickers（lib x2 + src x2，/api/dsh-stickers）、dsh-turn-rewind（lib/index.js x1 + lib/rewind-host.js x1 + src x3）。全部精确字符串替换（整词），备份 .bak-httpServer，node --check 通过。禁用插件（multimedia-webui-input/music-player/web-panel/web-terminal.disabled）不修。验证（PID 45980）：/skill-stats/api/stats?scope=current → 200 JSON 191 skills；/skills-manager/api/skills → 200 JSON；/skills-manager → 404 JSON（非 HTML fallback）；/api/dsh-meme/1.png、/api/dsh-stickers/1.png → 404 \"not found\" 文本（路由已注册）；err.log 干净。",
+      "createdAt": "2026-08-14T19:00:06.103",
+      "updatedAt": "2026-08-14T19:00:06.103"
+    }
+  ],
+  "C:/Users/12971/.dsh/source/staging-20260814T0650Z/packages/core/session/src/index.ts": [
+    {
+      "id": "notebook-1786708866754_hxgimxsy4",
+      "filePath": "C:/Users/12971/.dsh/source/staging-20260814T0650Z/packages/core/session/src/index.ts",
+      "note": "Session.append() ignorable 通道补丁（2026-08-14，已提交 master 两个 commit：5f95b442ef 主体 + 115455c62f 审查修正）：types.ts 新增 SessionAppendOptions{ignorable?: true}（注释说明 surface 事件冗余）；index.ts append 签名支持第三参数 opts，事件构造带 ignorable:true；LOW-5 fail-fast：ignorable 非 true/undefined 时抛错（防 JS 插件误用毒化日志）。kimi-k3（本地 newapi http://127.0.0.1:3000/v1，key=$env:NEWAPI_API_KEY，模型 kimi-k3，注意 reasoning_content 字段与 max_tokens 需 ≥16000 才出 content）审查结论 Approve，报告存 ~/.dsh/tools/review-kimi-k3.txt。auto-blame 插件（disabled 中）lib+src 也补了 ignorable（备份 .bak-20260814T203106 前的 .bak-20260814T195426 是 checkpoint/rewind 的）。lib/index.js 为手工同步 fail-fast（.bak-20260814T203106），正式 tsdown 重建会覆盖为正确版本。push/commit 需 LEFTHOOK=0 跳过 lefthook（pre-commit/pre-push 全量构建会卡 5-10 分钟）。重启后 PID 31208，err.log 干净。",
+      "createdAt": "2026-08-14T20:01:06.754",
+      "updatedAt": "2026-08-14T20:33:19.834"
+    }
+  ],
+  "../dsh-meme/src/index.ts": [
+    {
+      "id": "notebook-1786713382797_insibcsmt",
+      "filePath": "../dsh-meme/src/index.ts",
+      "note": "【构建注意】D:\\github\\DeepSeek\\dsh-meme 的 node_modules 未装 devDependencies（无 tsdown/rolldown，无锁文件），pnpm build 会失败（'tsdown' is not recognized）。lib/index.js 当前是手工同步的已验证产物，若未来补装依赖重新构建需确认产物与手工版一致。",
+      "createdAt": "2026-08-14T21:16:22.797",
+      "updatedAt": "2026-08-14T21:16:22.797"
+    },
+    {
+      "id": "notebook-1786713382797_cda24exc0",
+      "filePath": "../dsh-meme/src/index.ts",
+      "note": "【dsh-meme 修正内容（kimi-k3 审查 P0-P3）】① P0 兜底时序：fallbackIfMemeMissing 不再用 hasNormalTurnCompletion（turn-stopping 触发时 turn/end 尚未写入，恒 false 导致兜底从未生效），改为只判断 isCurrentTurnBackfilled + hasMemeInCurrentTurn；② B-2/B-4 本轮范围：currentTurnStartIndex（最后一个 user/message 之后）定位本轮，hasMemeInCurrentTurn 只扫本轮，历史轮表情不再误导；③ B-3 相对路径：localMemeUrl(ctx) 绝对 http://127.0.0.1:<port> → memeUrl(file) 相对 /api/dsh-meme/<file>，删除 LOOPBACK_HOST，远程浏览器/HTTPS 反代可用；④ B-5 情绪节点本轮限定：emotionalNodeSuggestion 只在本轮范围找 tool/result（去掉了 turn/end 分支——turn/end 在 turn-stopping 时未写入不可靠）；⑤ B-6 slice 魔法数字：路由 handler 保持 API_ROOT.length 派生；⑥ B-7 注释清理：httpServer 旧名 → webServer；⑦ B-8：turn-stopping signal.aborted 消费 + cache-control 去掉 immutable（配合 ?v= 版本号）。mock 冒烟 12/12 通过，重启后图片路由 200 + 穿越 404。",
+      "createdAt": "2026-08-14T21:16:22.797",
+      "updatedAt": "2026-08-14T21:16:22.797"
+    },
+    {
+      "id": "notebook-1786713382797_dzzdw41oi",
+      "filePath": "../dsh-meme/src/index.ts",
+      "note": "【重要位置教训】dsh-meme 的开发源码仓库在 D:\\github\\DeepSeek\\dsh-meme（git origin=https://github.com/omdsh-dev/dsh-meme.git），部署运行时加载的是 C:\\Users\\12971\\.dsh\\plugins\\dsh-meme（纯复制部署副本，无 src）。两者 lib/index.js 改前 hash 完全一致（同一构建产物），审查对象没问题，但修改必须落在 D盘源码仓库（src/index.ts 重写 + lib 同步 + package.json description webServer），再同步部署副本。已同步完成（2026-08-14T21:06）。",
+      "createdAt": "2026-08-14T21:16:22.797",
+      "updatedAt": "2026-08-14T21:16:22.797"
+    }
+  ],
+  "C:/Users/12971/skills": [
+    {
+      "id": "notebook-1786717163421_qb963xzfo",
+      "filePath": "C:/Users/12971/skills",
+      "note": "【易混淆点】C:\\Users\\12971\\skills（Snow 全局 skills，132→143 个目录）与 D:\\github\\DeepSeek\\test-ShiroEirin\\.agents\\skills（dsh 仓库 project 级 skills，11 个 dsh-*）是两套不同来源：全局目录里原本没有 dsh-* 系（2026-08-14 已复制补齐）。7/27 清理的 41 个约束型 skills 备份在 .sync-backups\\constraint-skills-backup-20260727.zip（124 条目）可恢复；sync-skills.ps1 + skills-manifest.json 是全局目录的同步管理机制（manifest 只登记 7 个上游仓库 28 个 skill，其余为 local-only）。",
+      "createdAt": "2026-08-14T22:19:23.421",
+      "updatedAt": "2026-08-14T22:19:23.421"
+    },
+    {
+      "id": "notebook-1786717163421_srp3jymwr",
+      "filePath": "C:/Users/12971/skills",
+      "note": "【2026-08-14 备份动作】test-ShiroEirin 仓库 .agents/skills 的 11 个 dsh 开发范式 skills 已复制到 C:\\Users\\12971\\skills 全局目录（用户担心将来搞坏，主动要求备份一份）：dsh-archive-agent-notes / dsh-code-review / dsh-doc-site-sync / dsh-doc-standards / dsh-find-simplifications / dsh-merging-stacked-prs / dsh-pre-push-checks / dsh-prose-standard / dsh-translate-docs / dsh-trim-cot-leakage / record-browser-gif。验证：11 个 SKILL.md 全在，21 个文件与源逐一对齐无缺失。主副本仍在仓库（git 追踪），全局目录是冗余副本。",
+      "createdAt": "2026-08-14T22:19:23.421",
+      "updatedAt": "2026-08-14T22:19:23.421"
+    }
+  ],
+  "docs/wsl-deploy.md": [
+    {
+      "id": "notebook-1786964659843_l3yzsguml",
+      "filePath": "docs/wsl-deploy.md",
+      "note": "WSL 部署可行性结论（2026-08-17）：项目官方支持 WSL —— config-catalog.md 明确 'macOS/Windows/WSL yes'（hasDocument 能力）；native-path-opener.ts 有完整 WSL 检测（WSL_DISTRO_NAME/WSL_INTEROP env + osRelease 含 microsoft）+ wslpath -w 路径转换。引擎要求 Node ^22.19.0 || >=24.0.0，pnpm@11.7.0。landlock-run 沙箱为 Linux 原生（Landlock 内核特性），WSL2 完整支持。本机 WSL: Debian v2 Running + docker-desktop Running。部署路径：从源码 git clone → pnpm install → pnpm run build → pnpm dsh web（官方 README 标准流程）；或 npx @deepseek-ai/dsh web 直装。注意：Windows 部署副本在 C:\\Users\\12971\\.dsh（junction 方案），WSL 需在 Linux 文件系统内独立部署，不能直接复用 NTFS 上的 node_modules（符号链接/大小写敏感/permission 差异）。",
+      "createdAt": "2026-08-17T19:04:19.843",
+      "updatedAt": "2026-08-17T19:04:19.843"
+    }
+  ],
+  "packages/terminal/terminal-bash/src/session.ts": [
+    {
+      "id": "notebook-1786965880938_chugqfhtb",
+      "filePath": "packages/terminal/terminal-bash/src/session.ts",
+      "note": "【已修复 2026-08-17】terminal-bash 精确就绪路径曾要求 promptTail === CONTROLLED_PROMPT('dsh> ')，而 tool-bash-persistent 初始化 send 把 PS1 改为 '__DSH_PERSISTENT_BASH_PROMPT__ ' → 快速命令必走 inferred_idle 静默兜底（idleSilenceMs 3000 + handoffGraceMs 500 = 3.5 秒/命令，minimal preset 默认配置必现，首命令 7 秒）。修复方案（未采用网传改常量 hack）：TerminalSendRequest 新增可选 expectedPrompt 字段（terminal/src/types.ts），LocalPtySession 按活跃 send 声明的文本做标记后尾部匹配并在 clearActive 复位（terminal-bash/src/session.ts），tool-bash-persistent 在 init send 与每条命令 send 声明 expectedPrompt: SHELL_PROMPT。配套：session.spec.ts 新增精确就绪用例（该包 Windows 被 vitest 排除，需临时 config 强制跑）、tools.spec.ts 断言每个 send 携带 expectedPrompt、README 双语就绪契约同步、Agent Note .agents/notes/implemented/bug-fix/2026-08-17-send-expected-prompt-readiness.md。⚠️ 环境坑：本机有 format-on-save 钩子会把 filesystem 工具写入的 src/tests 文件 prettier 化成分号+双引号风格（与仓库无分号+单引号冲突）——改用 terminal-execute 里的 Node 脚本写入可绕开。",
+      "createdAt": "2026-08-17T19:24:40.938",
+      "updatedAt": "2026-08-17T20:11:55.042"
+    }
+  ],
+  "C:/Users/12971/.dsh/plugins/README.md": [
+    {
+      "id": "notebook-1786971863164_wuqwnm761",
+      "filePath": "C:/Users/12971/.dsh/plugins/README.md",
+      "note": "2026-08-17 awesome-dsh-plugin 精选安装（21 个）：npm 16 个（context/smooth-stream/lsp-actions/auto-review/mcp-lens/chat-import/movein/doc-share/auto-mode/agent-teams/vision-toolkit/modsearch/anysearch-dsh/auto-continue/usage-stats/compressor）+ 源码 5 个（undo-plugin→dsh-undo-savepoint/cost-meter/reasoning-effort/file-changes/abyss）。\n安装方式：npm 用 dsh plugin --profile web add；源码用 plugins 目录 + junction 链接（node_modules 下建 junction 指向 plugins 目录）+ profiles/web/package.json bundles 注册。\n坑：① undo-plugin 包名是 dsh-undo-savepoint，junction 名和 bundle 名必须用包名而非目录名；② abyss 零运行时依赖，src 直接 tsx 加载（main 改 ./src/index.ts），client.js 107KB 直接可用；③ 纯 host 插件无 client bundle，不进 boot entries 属正常；④ modsearch 注册 id 是 modsearch，anysearch 注册 id 是 web-search-anysearch，lsp-actions 注册 id 是 lsp-actions。\n验证：web PID 56664，/abyss 返回真实 JSON 快照，cost-meter 账本加载成功，boot entries 81 个。\nbetter-session（morlay）未装：GitHub Packages 私有 + 4 子包需构建 + drizzle/pg 重依赖，风险高待评估。",
+      "createdAt": "2026-08-17T21:04:23.164",
+      "updatedAt": "2026-08-17T21:04:23.164"
+    }
+  ],
+  "C:/Users/12971/.dsh/profiles/web/cordis.patch.yml": [
+    {
+      "id": "notebook-1787025618139_n1a4l0va4",
+      "filePath": "C:/Users/12971/.dsh/profiles/web/cordis.patch.yml",
+      "note": "dsh CLI 的 plugin 子命令只有 add/remove/reconcile（管理 bundles 依赖），没有 disable——禁用必须走 cordis.patch.yml patch 层",
+      "createdAt": "2026-08-18T12:00:18.139",
+      "updatedAt": "2026-08-18T12:00:18.139"
+    },
+    {
+      "id": "notebook-1787025618139_qhob64zxj",
+      "filePath": "C:/Users/12971/.dsh/profiles/web/cordis.patch.yml",
+      "note": "2026-08-18 按用户要求禁用了 3 个侧边栏底部 UI 插件：cost-meter（dsh-cost-meter 余额/峰时提示）、usage-stats（dsh-usage-stats 使用统计）、import-claude（dsh-chat-import 导入会话，注册 id ≠ 包名！）。原文件备份在 tools/cordis.patch.yml.bak-disable-ui-20260818T115303",
+      "createdAt": "2026-08-18T12:00:18.139",
+      "updatedAt": "2026-08-18T12:00:18.139"
+    },
+    {
+      "id": "notebook-1787025618139_vjtk8ywfs",
+      "filePath": "C:/Users/12971/.dsh/profiles/web/cordis.patch.yml",
+      "note": "验证禁用是否生效：`node --import ./node_modules/tsx/dist/esm/index.mjs ./apps/cli/src/bin.ts --profile web --dump-config`（工作目录 source/current），看目标 entry 是否 disabled: true",
+      "createdAt": "2026-08-18T12:00:18.139",
+      "updatedAt": "2026-08-18T12:00:18.139"
+    },
+    {
+      "id": "notebook-1787025618139_kua8o3mhc",
+      "filePath": "C:/Users/12971/.dsh/profiles/web/cordis.patch.yml",
+      "note": "官方插件禁用机制（无需删文件/卸依赖）：在 profile 的 cordis.patch.yml 写 `- id: <注册id>\\n  disabled: true`。依据：@deepseek-ai/cordis-plugin-include 的 PatchOptions 接口含 disabled 字段，applyEntryPatches 会把 patch 条目里除 id/insert/name 外的所有字段覆盖到目标 entry。恢复方法：改 false 或删条目，重启 web 生效",
+      "createdAt": "2026-08-18T12:00:18.139",
+      "updatedAt": "2026-08-18T12:00:18.139"
+    }
+  ],
+  "C:/Users/12971/.dsh/profiles/web/package.json": [
+    {
+      "id": "notebook-1787035354997_qmqi0og9f",
+      "filePath": "C:/Users/12971/.dsh/profiles/web/package.json",
+      "note": "web 启动后主页面只有一个 /assets/index-*.js 属正常（SPA 单 bundle）；组件 client.js 在 profile node_modules/@linxin666/<pkg>/lib/client.js",
+      "createdAt": "2026-08-18T14:42:34.997",
+      "updatedAt": "2026-08-18T14:42:34.997"
+    },
+    {
+      "id": "notebook-1787035354997_yv76byh9v",
+      "filePath": "C:/Users/12971/.dsh/profiles/web/package.json",
+      "note": "dsh-tui（MashedPotato817/dsh-tui）是独立 TUI 终端客户端，不是 web 插件：`npm i -g dsh-tui@0.2.19`，bin=tui.js，连接 dsh web 的 3080（DSH_URL 可覆盖）。Claude Code 风格 HUD + Vim 模态，工作区建议项目子目录（沙箱临时目录规则）",
+      "createdAt": "2026-08-18T14:42:34.997",
+      "updatedAt": "2026-08-18T14:42:34.997"
+    },
+    {
+      "id": "notebook-1787035354997_9i46dm1wx",
+      "filePath": "C:/Users/12971/.dsh/profiles/web/package.json",
+      "note": "⚠️ 冲突坑：web-ui-all 把 dsh-better-sidebar@0.13.0 作为 external 依赖并插 web-ui-better-sidebar（注册 /sidebar/api）；同时 profile 若有老 dsh-better-sidebar 也注册 /sidebar/api → webserver: duplicate prefix route `/sidebar/api` → web 启动直接 crash。修复：cordis.patch.yml 加 `- id: web-ui-better-sidebar\\n  disabled: true`（保留老侧边栏）。web.log 没有插件 startup 日志属正常，dump-config 看 id 才是权威",
+      "createdAt": "2026-08-18T14:42:34.997",
+      "updatedAt": "2026-08-18T14:42:34.997"
+    },
+    {
+      "id": "notebook-1787035354997_fqae30uze",
+      "filePath": "C:/Users/12971/.dsh/profiles/web/package.json",
+      "note": "2026-08-18 启动 dsh-web-ui：`dsh plugin --profile web add @linxin666/dsh-web-ui-all@0.2.0`（作者 linxin666/zhu1090093659，README 写 0.1.12 但 npm 最新是 0.2.0，上游 git HEAD 30caa3aa）。聚合 14 组件：web-ui-compat/settings/community-plugins/aionui-panel/task-board/git-graph/pet/remote-web-ui/ssh/describe-image/liangshen/skill-explorer/skin-center + web-ui-better-sidebar",
+      "createdAt": "2026-08-18T14:42:34.997",
+      "updatedAt": "2026-08-18T14:42:34.997"
+    }
+  ],
+  "C:/Users/12971/.dsh/upstream-check/backup-dsh-web-ui-patch-20260819/packages/skins/skin-center/src/client/skin-center.module.css": [
+    {
+      "id": "notebook-1787138078112_8f9als0w1",
+      "filePath": "C:/Users/12971/.dsh/upstream-check/backup-dsh-web-ui-patch-20260819/packages/skins/skin-center/src/client/skin-center.module.css",
+      "note": "验证记录：补丁套到 upstream-latest 基座后 tsc --noEmit 干净；rating 4/4 + wallpaper-boot 7/7 + wallpaper 控制器 11/11 全过。老 clone zhu1090093659__dsh-web-ui@696bd50 宿主侧完全没有 we 接线（无 we-routes/we-library/http-utils.ts），从那里构建部署壁纸 API 全 404。已部署 npm @linxin666/dsh-web-ui-all@0.2.0 与 plugins/dsh-webui-skin-center 均无 wallpaper 功能",
+      "createdAt": "2026-08-19T19:14:38.112",
+      "updatedAt": "2026-08-19T19:14:38.112"
+    },
+    {
+      "id": "notebook-1787138078112_yltvt9429",
+      "filePath": "C:/Users/12971/.dsh/upstream-check/backup-dsh-web-ui-patch-20260819/packages/skins/skin-center/src/client/skin-center.module.css",
+      "note": "🟠 boot 恢复双实现冲突：用户版 createWallpaperSelectionResolver(wallpaper-boot.ts, 108行, 7/7 测试过) vs 上游 installBootRestore(wallpaper.ts L568)。上游多 resolveSelection 回退 'imported/'+id（原件丢失但导入副本还在时能恢复），用户版缺→会 sync(null) 放弃；用户版优点：ctx.effect 退订干净 + fetch 可注入可测。合并建议：保留用户版骨架+测试，移植 resolveSelection 回退",
+      "createdAt": "2026-08-19T19:14:38.112",
+      "updatedAt": "2026-08-19T19:14:38.112"
+    },
+    {
+      "id": "notebook-1787138078112_l8a95nbsb",
+      "filePath": "C:/Users/12971/.dsh/upstream-check/backup-dsh-web-ui-patch-20260819/packages/skins/skin-center/src/client/skin-center.module.css",
+      "note": "🟠 wallpaper-panel.spec.tsx 的 stubWallpaper 缺 sound/volume/setSound/setVolume 四个成员 → 3 个用例运行时崩溃（useSyncExternalStore 拿到 undefined getSnapshot）；上游自己的 spec stub 有这四个成员。we-library.spec expandUser 用 process.env.HOME 在 Windows 必挂（应 os.homedir()）。we-routes.spec inventory 在本机挂：buildInventory autoDetect 不可注入，真实 WE 库 749 条泄漏进测试",
+      "createdAt": "2026-08-19T19:14:38.112",
+      "updatedAt": "2026-08-19T19:14:38.112"
+    },
+    {
+      "id": "notebook-1787138078112_8i96nfqp0",
+      "filePath": "C:/Users/12971/.dsh/upstream-check/backup-dsh-web-ui-patch-20260819/packages/skins/skin-center/src/client/skin-center.module.css",
+      "note": "🔴 关键 BUG：正式 skin-center.module.css(577行) 缺 .wallpaperRatingTabs/.wallpaperRatingBadge(R18)/.wallpaperPager(Info) 样式——它们全在孤儿文件 skin-center.module.css.patched(622行) 里未生效；即使 .patched 也缺 .wallpaperDirs/.wallpaperDir*/.wallpaperDirInput 样式。Panel 引用 23 个 css.wallpaper* 类，css 只定义 14 个。上游 upstream-latest 同样有这个缺样式 BUG（可作 PR 切入点）",
+      "createdAt": "2026-08-19T19:14:38.112",
+      "updatedAt": "2026-08-19T19:14:38.112"
+    },
+    {
+      "id": "notebook-1787138078112_atmbjclfa",
+      "filePath": "C:/Users/12971/.dsh/upstream-check/backup-dsh-web-ui-patch-20260819/packages/skins/skin-center/src/client/skin-center.module.css",
+      "note": "wallpaper 分级/分页补丁审查(2026-08-19)：补丁全集在 backup-dsh-web-ui-patch-20260819/packages/skins/skin-center（镜像包布局）+ backup-dsh-web-ui-20260819-1820（扁平 src 布局）；基线=upstream-pristine（无分级）；upstream-latest（18:22 快照）已独立吸收 rating/pagination/contentrating（we-library/we-routes 与补丁字节一致）并多加 installBootRestore+页面跳转，补丁基线已落后",
+      "createdAt": "2026-08-19T19:14:38.112",
+      "updatedAt": "2026-08-19T19:14:38.112"
+    }
+  ]
+}

@@ -1,0 +1,759 @@
+{
+  "d56017b7-8d58-4a92-bc11-ed8c8109ea70:289": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1785857301661_q67iw8dkj"
+    }
+  ],
+  "e7a7d012-f48e-47e7-85ff-036cc86600e4:34": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1785857962064_36592g3sq"
+    }
+  ],
+  "e7a7d012-f48e-47e7-85ff-036cc86600e4:97": [
+    {
+      "op": "update",
+      "notebookId": "notebook-1785857962064_36592g3sq",
+      "previousNote": "2026-08-04 第五轮审查（对齐 VCP 原源码 + 官方 docs）修复清单：① V9.1 参数补齐——wormholeGain=1.35（预算内 conductance 加权，非'无×1.35'）、baseMomentum=2.0、firGamma=0.6（hop 权重 γ^hop 归一化）、wormholeDecay=0.70、firingThreshold 0.01→0.10（对齐 TagMemoEngine.js:458/685/695/688/686）；② §8.4 补 tagMemoActivation = coverage×coherence×(1-noise)（ResidualPyramid.js:347），activation 兼用于 β 融合与 Tag 感应；③ §2.1/§13 的'一切注册走 ctx.effect()'与 §5.2 的'[Service.init] 返回 disposer 禁 ctx.effect'矛盾——统一为 disposer 管理（GPT 按 §2.1 写会双启动）；④ static inject 不标注 string[]（cordis inject 类型是 (keyof Context)[]，标注会 TS 报错）；⑤ §1.1 素材样例中性化（tool/result→'工具执行失败事件'等，移除 DSH 特定事件名）；⑥ §10.1 迁移补 source.type='vcp-dailynote'。实证：node:sqlite 支持 FTS5 ✅（Windows node 直接验证）。"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1785858084497_ysfeq3txi"
+    }
+  ],
+  "e7a7d012-f48e-47e7-85ff-036cc86600e4:125": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1785858429219_82nk94hfj"
+    }
+  ],
+  "e7a7d012-f48e-47e7-85ff-036cc86600e4:175": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1785859217083_ynv3vttws"
+    }
+  ],
+  "e7a7d012-f48e-47e7-85ff-036cc86600e4:414": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1785860232746_pb8nhoj1x"
+    }
+  ],
+  "e7a7d012-f48e-47e7-85ff-036cc86600e4:480": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1785860528281_buttwz6b2"
+    }
+  ],
+  "ba8133c3-082f-4c0a-932b-f807c01df748:36": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1785861993049_i1e1x0a1g"
+    }
+  ],
+  "ba8133c3-082f-4c0a-932b-f807c01df748:139": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1785862941957_grjlmvpma"
+    }
+  ],
+  "ba8133c3-082f-4c0a-932b-f807c01df748:237": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1785869441259_rxhvu6bu6"
+    }
+  ],
+  "ba8133c3-082f-4c0a-932b-f807c01df748:264": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1785869670108_36yzc7l3d"
+    }
+  ],
+  "ba8133c3-082f-4c0a-932b-f807c01df748:305": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1785872645710_mwwjxa3o8"
+    }
+  ],
+  "f4e5ab0f-b9ed-43dd-a344-e0c7c587794e:137": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786002978917_5tt1m9tb4"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786002978917_3k6oyytiq"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786002978917_9kpod8twy"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786002978917_abqgshxl2"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786002978917_scypbq9ve"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786002978917_8oeweubo7"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786002978917_t52tbade0"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786002978917_8t4jwubfv"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786002978917_i2oc77aa2"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786002978917_v3w3gda9r"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786002978917_vmyxev95m"
+    }
+  ],
+  "f4e5ab0f-b9ed-43dd-a344-e0c7c587794e:298": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786005350811_azct2ootr"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786005350811_hbvlt050z"
+    }
+  ],
+  "9c9667d7-bfe6-404f-bcd4-da6fc9a66d82:65": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786006948368_be3phkxij"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786006948368_fcjr85fqw"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786006948368_ggl3gg7a6"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786006948368_ti80u7i9w"
+    }
+  ],
+  "8d915b52-3988-4b3d-9c49-ef423a920150:74": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786009373409_y3ih0koig"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786009373409_q9kv2r9qs"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786009373409_7j8ndl2ya"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786009596129_hvkjpxlb4"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786010046746_cpyfsxzk7"
+    }
+  ],
+  "1e1f69f5-0149-45c9-a669-18cefb427943:115": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786010330031_xva1wsevh"
+    }
+  ],
+  "1e1f69f5-0149-45c9-a669-18cefb427943:172": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786011907485_vfvhdr1i5"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786011907568_ev961ng1a"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786011907652_stusk4bol"
+    }
+  ],
+  "fc992b7e-0151-4916-8673-2406bc8fa512:232": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786012267648_5d9fuatzq"
+    }
+  ],
+  "fc992b7e-0151-4916-8673-2406bc8fa512:264": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786015631738_924dtxzc5"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786015631738_ud1bonj7h"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786015631738_triuq9xti"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786015631738_oeeubzc1g"
+    }
+  ],
+  "98a34155-c62b-487a-8a07-4c0270ce24f6:210": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786077559684_zzxhxe7vm"
+    }
+  ],
+  "4a5825b8-d996-4bcb-ad1d-7b6247717383:318": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786086579107_8sgigbzv3"
+    }
+  ],
+  "460539b8-f11e-41a4-8398-cf4c55bbb5db:45": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786087212821_tf6jvzfxv"
+    }
+  ],
+  "51c8be45-dd03-4e4f-b7ed-e0719c4ae453:14": [
+    {
+      "op": "update",
+      "notebookId": "notebook-1786087212821_tf6jvzfxv",
+      "previousNote": "WSL 部署 dsh web（Windows 侧 PowerShell 操作 WSL）关键坑（2026-08-07 实操验证，commit fb0861a4 部署成功）：1) PowerShell 调 wsl bash -lc 时，双引号内 \\$VAR / $(...) 会被 PS 展开或吃掉 → 一律 bash -lc + 单引号包整段脚本，或硬编码时间戳/路径，不要用 $() 生成 STAMP（会变空导致 'dsh-staging/' 非法分支名）；2) PATH 必须写死 'export PATH=\"/home/aikun/.nvm/versions/node/v22.21.1/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\"'，勿用 \\$PATH 拼接（PS 会展开成空）；3) worktree 新建后 pnpm install 的 install-lefthook 可能拒绝：a) worktree-scoped core.hooksPath 残留 Windows 路径（D:\\...dsh-hooks）→ 先 git config --worktree --unset core.hooksPath 再重跑；b) 用户全局 .gitconfig 有 core.hooksPath（/home/aikun/.config/git/hooks）→ 用 DSH_LEFTHOOK_ALLOW_HOOKS_PATH_OVERRIDE=1 pnpm install；4) 重启 dsh web：kill 精确 PID（ps 查 'bin.ts web'）→ cd /home/aikun/.dsh/source/current && setsid nohup ./bin/dsh web > /home/aikun/.dsh/web.log 2>&1 < /dev/null &；5) 验证：ss -ltnp | grep 3080 + curl http://127.0.0.1:3080/ 返回 200 + git -C current rev-parse --short HEAD == 期望 commit；6) current 是 symlink，重指 = rm current && ln -s <staging> current"
+    }
+  ],
+  "e9569fc3-4ab8-4ae1-8002-41d1be0fec5f:91": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786090109578_9lsqndvig"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786090114941_cq6kmq435"
+    }
+  ],
+  "30a595a6-fa40-4a7d-a613-6be1702a526e:216": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786093507648_iphwiqzpc"
+    }
+  ],
+  "d50d6dc2-e7d9-4631-90db-7ba9df8ebbc6:93": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786094088496_84wpd1vzw"
+    }
+  ],
+  "5725db2d-781b-4e9c-8665-faec648e7cae:35": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786095290624_kynizj5g2"
+    }
+  ],
+  "01947c2c-f473-494c-afe9-e2fa4dbfabd8:138": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786096106112_06sk8tknh"
+    }
+  ],
+  "2122668b-930c-46bc-a4ea-6e2a790679fd:158": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786098106754_j8xqfubhs"
+    }
+  ],
+  "3b9585ba-f2df-4aa5-8f03-31ae09c54407:76": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786099809581_qffutnq01"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786099809581_tj8xz7ic8"
+    }
+  ],
+  "f8e9a566-eb2f-4bd8-8b65-f856a2f7b893:16": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786100423564_xit6p5fx5"
+    }
+  ],
+  "f8e9a566-eb2f-4bd8-8b65-f856a2f7b893:198": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786102367162_nio5ck8i4"
+    }
+  ],
+  "f8e9a566-eb2f-4bd8-8b65-f856a2f7b893:312": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786121203572_2y5a3wrik"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786121203572_aknnueyyn"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786121203572_e0m092fkp"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786121203572_y3gis69fk"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786121203572_1crflgdr8"
+    }
+  ],
+  "8d2cc268-c5e1-44c1-b95a-0c8c66902f6a:186": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786337889472_5d79ig721"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786337889472_4bnfnncpr"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786337889472_24p2jwh4h"
+    }
+  ],
+  "88cfe56c-a0f6-42f3-873d-559e63cf8fc9:113": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786347760396_asgq2w0yw"
+    }
+  ],
+  "741a85df-b57b-404d-8d4e-d8b8ec9c0659:101": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786352645923_eaqj34glb"
+    }
+  ],
+  "069456a2-b0cf-4934-b5f6-7ad10560da9b:207": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786355797556_6umz5h9k7"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786355797556_h37yu5x3f"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786355797556_wvdwijdbf"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786355797556_we8gesjhx"
+    }
+  ],
+  "069456a2-b0cf-4934-b5f6-7ad10560da9b:273": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786356249701_vq7g7ywzu"
+    }
+  ],
+  "32427d6d-fcc6-422d-a020-61ba7df8c792:74": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786359363469_7t6wdw812"
+    }
+  ],
+  "71113c15-c595-403a-98b7-8b8699f5f01c:78": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786364518982_ihrz9rarw"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786364518983_gqzk95d4u"
+    }
+  ],
+  "55d61ffc-9488-4d31-a366-ab153c675c50:13": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786370995803_bi6zfylgv"
+    }
+  ],
+  "70588389-1172-4610-9f0b-8721e60e85d2:349": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786438316512_bcve60s4j"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786438316512_4a30n2hmm"
+    }
+  ],
+  "6ef15e63-9078-4cf7-a972-83a773b53ddc:34": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786438927816_7cwsjgbfl"
+    }
+  ],
+  "b1f4e708-1c53-4c7f-96b6-3ee0ca4d9671:109": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786440332466_4gsovs2e0"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786440332611_43pj4gb9w"
+    }
+  ],
+  "efbb0ce5-53fb-44cd-91e7-064ea546bc9b:17": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786441972605_roy0rvof6"
+    }
+  ],
+  "efbb0ce5-53fb-44cd-91e7-064ea546bc9b:60": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786442333467_7dfsu560u"
+    }
+  ],
+  "efbb0ce5-53fb-44cd-91e7-064ea546bc9b:86": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786442926738_b0v228tw2"
+    }
+  ],
+  "efbb0ce5-53fb-44cd-91e7-064ea546bc9b:137": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786443134832_fsqrvg19p"
+    }
+  ],
+  "67ce3a94-b933-4bc2-8031-0be927522ce1:137": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786447018885_2ipsnii8k"
+    }
+  ],
+  "67ce3a94-b933-4bc2-8031-0be927522ce1:189": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786447336206_tw1m4v9u4"
+    }
+  ],
+  "67ce3a94-b933-4bc2-8031-0be927522ce1:212": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786451338218_gy28qw76e"
+    }
+  ],
+  "6811a3df-0d05-4677-a4ef-2e735f8b609d:83": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786456553532_ui95h5vby"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786456553532_pgtrwphhq"
+    }
+  ],
+  "aa0457fb-fbda-43cd-b22e-b3868c81ed21:158": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786459535181_1rgobikfj"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786459535181_pfcwtyqhc"
+    }
+  ],
+  "aa0457fb-fbda-43cd-b22e-b3868c81ed21:207": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786460126756_jsy29yyg9"
+    }
+  ],
+  "aa0457fb-fbda-43cd-b22e-b3868c81ed21:232": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786460337846_wxf92t4dn"
+    }
+  ],
+  "aa0457fb-fbda-43cd-b22e-b3868c81ed21:303": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786520512277_b6mmdlqys"
+    }
+  ],
+  "a7fd4762-48c7-47e8-baac-509a726d5df9:186": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786689763920_aa8bnzc56"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786689763920_e72u0zdwr"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786689763920_btogitk3t"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786689763920_t02c4zft9"
+    }
+  ],
+  "8c1c5208-8595-43cf-a315-78348eefa11e:117": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786691747491_b2k388lqw"
+    }
+  ],
+  "8c1c5208-8595-43cf-a315-78348eefa11e:170": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786696681674_f3s7of045"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786696681674_yiwgp62bn"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786696681674_9metj3j4p"
+    }
+  ],
+  "e01b4552-7e63-4c7d-8463-50286ff439e5:86": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786696914432_vj1a6roxp"
+    }
+  ],
+  "e01b4552-7e63-4c7d-8463-50286ff439e5:115": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786697656261_0wqenj5op"
+    }
+  ],
+  "e01b4552-7e63-4c7d-8463-50286ff439e5:160": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786698325388_wkydwho2p"
+    }
+  ],
+  "e01b4552-7e63-4c7d-8463-50286ff439e5:399": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786704481001_lzu1z0co4"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786704481001_hwjw5hm8l"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786704481001_l1htceck7"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786704481001_fw4802hkc"
+    }
+  ],
+  "efccfd41-8dcd-4cd5-974e-b1bbae475548:116": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786704862096_k2d9lepl5"
+    }
+  ],
+  "efccfd41-8dcd-4cd5-974e-b1bbae475548:133": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786705013017_izyypve4t"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786705206103_ys14vfji3"
+    }
+  ],
+  "efccfd41-8dcd-4cd5-974e-b1bbae475548:243": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786705611814_kbkhod081"
+    }
+  ],
+  "efccfd41-8dcd-4cd5-974e-b1bbae475548:427": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786707972602_gfvf9bfkc"
+    }
+  ],
+  "efccfd41-8dcd-4cd5-974e-b1bbae475548:494": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786708132640_luz0qjrms"
+    }
+  ],
+  "61866401-3f09-49e8-bf66-6f0ba46b4be4:113": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786708866754_hxgimxsy4"
+    }
+  ],
+  "61866401-3f09-49e8-bf66-6f0ba46b4be4:129": [
+    {
+      "op": "update",
+      "notebookId": "notebook-1786708866754_hxgimxsy4",
+      "previousNote": "Session.append() ignorable 通道补丁（2026-08-14，本地部署修复）：types.ts 新增 SessionAppendOptions{ignorable?: true}；index.ts append 签名支持第三参数 opts，事件构造加 ...(ignorable ? { ignorable: true as const } : {})。修复 API 不对称 bug：写端硬编码 envelope 无 ignorable 通道，读端 coordinator.ts:1063 白名单校验拒绝未知事件（SessionFormatUnsupportedError 毒整条日志）。checkpoint/rewind 插件 lib+src 调用点已同步加 { ignorable: true }（备份 .bak-20260814T195426）。lib/index.js 为 tsdown 产物（14:54 构建），tsc 只更新 lib/types/*；tsdown -F 过滤在 Windows 未生效（No valid configuration found），lib/index.js 手工补丁两行（.bak-20260814T195531）——重建 host lib 会回归，需注意。冒烟验证：append(...,{ignorable:true}) → 事件带 ignorable:true；不带 → 无字段向后兼容。重启后 PID 40636，err.log 干净。"
+    }
+  ],
+  "61866401-3f09-49e8-bf66-6f0ba46b4be4:239": [
+    {
+      "op": "update",
+      "notebookId": "notebook-1786708866754_hxgimxsy4",
+      "previousNote": "Session.append() ignorable 通道补丁（2026-08-14，已提交 master 5f95b442ef）：types.ts 新增 SessionAppendOptions{ignorable?: true}；index.ts append 签名支持第三参数 opts（SurfaceEventType 时 SurfaceIntent & SessionAppendOptions，否则可选 SessionAppendOptions），事件构造加 ...(ignorable ? { ignorable: true as const } : {})。修复 API 不对称 bug：写端硬编码 envelope 无 ignorable 通道，读端 coordinator.ts:1063 白名单校验拒绝未知事件（SessionFormatUnsupportedError 毒整条日志）。checkpoint/rewind 插件 lib+src 调用点已加 { ignorable: true }（部署区 ~/.dsh/plugins，备份 .bak-20260814T195426，不入 git）。lib/index.js 已被 lefthook pre-push 的 build:lib:host 正式构建覆盖（mtime 20:12:38，含补丁），手工补丁版 .bak-20260814T195531 可弃。官方不收 PR/issues（CONTRIBUTING: cannot accept external PRs; hasIssuesEnabled=false），仅 Discussions 可报告。push 需 LEFTHOOK=0 跳过全量构建 hook（否则卡 5-10 分钟）。"
+    }
+  ],
+  "96f4b164-4d00-4f47-b43e-cc9ca3fb192a:17": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786713382797_dzzdw41oi"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786713382797_cda24exc0"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786713382797_insibcsmt"
+    }
+  ],
+  "96f4b164-4d00-4f47-b43e-cc9ca3fb192a:155": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786717163421_srp3jymwr"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1786717163421_qb963xzfo"
+    }
+  ],
+  "96f4b164-4d00-4f47-b43e-cc9ca3fb192a:297": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786953553951_d0ybva2in"
+    }
+  ],
+  "96f4b164-4d00-4f47-b43e-cc9ca3fb192a:393": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786958152506_qw5o599qr"
+    }
+  ],
+  "96f4b164-4d00-4f47-b43e-cc9ca3fb192a:629": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786962179109_gnsqqynwx"
+    }
+  ],
+  "038a1473-5bcd-4faa-a4e0-d028dc5bcdff:11": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786964659843_l3yzsguml"
+    }
+  ],
+  "17ed8678-e270-42c1-bdef-d4fee12f7313:1": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786965880938_chugqfhtb"
+    }
+  ],
+  "17ed8678-e270-42c1-bdef-d4fee12f7313:39": [
+    {
+      "op": "update",
+      "notebookId": "notebook-1786965880938_chugqfhtb",
+      "previousNote": "【已核实的真实性能 Bug】terminal-bash 的精确就绪路径要求 promptTail === CONTROLLED_PROMPT('dsh> ', sanitize.ts:9)，但 tool-bash-persistent 初始化时发送 `stty -echo; PS1=__DSH_PERSISTENT_BASH_PROMPT__ `(其 index.ts:247) 永久改变 PS1 → promptTextSeen 永远 false → 快速命令(pwd/ls)无法走 session.ts:446 精确路径(~50ms)，也无法走 exactProbeAfterMs(150ms) 路径(瞬时命令在 50ms 轮询间隔内无可观察的前台离开-wait 转移，acceptsStdinWait 对同 pgid 要求先观察到离开) → 只能走 session.ts:464 inferred_idle 静默兜底 = idleSilenceMs(3000) + handoffGraceMs(500, promptSeen=true 时) = 3.5 秒/命令。minimal preset(apps/cli/config/agent-presets/minimal/agent.cordis.yml)未覆盖这两个参数，默认配置下必现。佐证：loader-composition.spec.ts 被迫把 idleSilenceMs 降到 100 才能在 20s 超时内跑完 8 次 bash 调用。修复方向：① 把 CONTROLLED_PROMPT 改成与 SHELL_PROMPT 一致(本地 hack 可行，因 spawn PS1 也来自该常量 index.ts:62)；② 更优雅：tool-bash-persistent 不改 PS1，或 terminal-bash 支持可配置/动态学习的 expected prompt。session.ts:394 源码已是 CONTROLLED_PROMPT.length + 1（编译产物中才是字面量 6）。"
+    }
+  ],
+  "038a1473-5bcd-4faa-a4e0-d028dc5bcdff:66": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1786971863164_wuqwnm761"
+    }
+  ],
+  "c79d05cb-3460-4bab-81ed-fe0d926621ef:10": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1787025618139_kua8o3mhc"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1787025618139_vjtk8ywfs"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1787025618139_qhob64zxj"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1787025618139_n1a4l0va4"
+    }
+  ],
+  "c79d05cb-3460-4bab-81ed-fe0d926621ef:156": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1787035354997_fqae30uze"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1787035354997_9i46dm1wx"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1787035354997_yv76byh9v"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1787035354997_qmqi0og9f"
+    }
+  ],
+  "1296113e-921f-4d3a-99ab-4122a587bab2:55": [
+    {
+      "op": "add",
+      "notebookId": "notebook-1787138078112_atmbjclfa"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1787138078112_8i96nfqp0"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1787138078112_l8a95nbsb"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1787138078112_yltvt9429"
+    },
+    {
+      "op": "add",
+      "notebookId": "notebook-1787138078112_8f9als0w1"
+    }
+  ]
+}
