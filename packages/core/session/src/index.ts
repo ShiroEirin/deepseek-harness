@@ -20,6 +20,7 @@ import type {
   EpochHeader,
   PrepareSessionOptions,
   RequestContext,
+  SessionAppendOptions,
   SessionEvent,
   SessionEventMap,
   SessionEventType,
