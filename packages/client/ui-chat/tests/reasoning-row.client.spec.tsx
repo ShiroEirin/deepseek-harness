@@ -14,7 +14,7 @@ const t = makeTranslate(zh, commonZh)
 const renderMessageImages: AssistantMarkdownProps['renderMessageImages'] = () => null
 
 describe('ReasoningRow', () => {
-  it('shows a stable running label while streaming, then the settled first line', () => {
+  it('follows the latest streaming line, then restores the settled first line', () => {
     const view = render(
       <AssistantMarkdown
         t={t}
@@ -24,7 +24,8 @@ describe('ReasoningRow', () => {
       />,
     )
     expect(view.getByText('运行中')).toBeTruthy()
-    expect(view.getByText('正在思考…')).toBeTruthy()
+    expect(view.getByText('Newest reasoning tokens').parentElement?.getAttribute('data-follow-end'))
+      .toBe('true')
 
     view.rerender(
       <AssistantMarkdown
@@ -34,9 +35,8 @@ describe('ReasoningRow', () => {
         renderMessageImages={renderMessageImages}
       />,
     )
-    // streaming keeps the stable label instead of chasing the latest line
-    expect(view.getByText('正在思考…')).toBeTruthy()
-    expect(view.queryByText('Newest reasoning tokens keep arriving')).toBeNull()
+    expect(view.getByText('Newest reasoning tokens keep arriving').parentElement
+      ?.getAttribute('data-follow-end')).toBe('true')
 
     view.rerender(
       <AssistantMarkdown
@@ -46,9 +46,9 @@ describe('ReasoningRow', () => {
         renderMessageImages={renderMessageImages}
       />,
     )
-    expect(view.getByText('Inspect the session')).toBeTruthy()
+    const settledSummary = view.getByText('Inspect the session')
     expect(view.queryByText('运行中')).toBeNull()
-    expect(view.queryByText('正在思考…')).toBeNull()
+    expect(settledSummary.parentElement?.hasAttribute('data-follow-end')).toBe(false)
   })
 
   it('expands from either Think or the reasoning summary', () => {
