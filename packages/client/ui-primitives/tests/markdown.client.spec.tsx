@@ -150,6 +150,7 @@ describe('MarkdownText', () => {
     expect(container.textContent).toContain('USER=~/y')
     expect(container.textContent).toContain('~单~')
   })
+
   it('links inline code through the file-mention resolver: URL first, settled only, never inside links', () => {
     const opened: string[] = []
     const fileMentions = {

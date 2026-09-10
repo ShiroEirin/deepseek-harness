@@ -1,32 +1,16 @@
-import {
-  useMemo,
-  useRef,
-  useState,
-  type ChangeEvent,
-  type KeyboardEvent,
-} from 'react'
+import { useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react'
 import clsx from 'clsx'
 import {
-  Button,
-  IconCheckOutline14,
-  IconChevronDownOutline14,
-  IconChevronLeftOutline14,
-  IconChevronRightOutline14,
-  IconChevronUpOutline14,
-  IconCloseOutline16,
-  IconEditOutline16,
-  MarkdownText,
+  Button, IconCheckOutline14, IconChevronDownOutline14, IconChevronLeftOutline14,
+  IconChevronRightOutline14, IconChevronUpOutline14, IconCloseOutline16,
+  IconEditOutline16, MarkdownText,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import {
   planReviewOf,
-  type QuestionAnswer,
-  type QuestionComposerProps,
+  type QuestionAnswer, type QuestionComposerProps,
 } from './contract/slots.ts'
 import type { PendingQuestion } from './contract/slots.ts'
-import type {
-  QuestionDraftAnswer,
-  QuestionDraftProgress,
-} from './draft-store.ts'
+import type { QuestionDraftAnswer, QuestionDraftProgress } from './draft-store.ts'
 import { PlanReviewPanel } from './PlanReviewPanel.tsx'
 import css from './QuestionComposer.module.css'
 
@@ -36,21 +20,15 @@ import css from './QuestionComposer.module.css'
  * runtime failure messages (finished strings from the wire) pass through
  * verbatim.
  */
-type Feedback =
-  | { key: 'error.incomplete' | 'error.unanswered' }
-  | { text: string }
+type Feedback = { key: 'error.incomplete' | 'error.unanswered' } | { text: string }
 
 /**
  * Split the conventional recommendation suffix without changing the answer value.
  * @param label - Original option label returned if selected.
  * @returns Display label plus recommendation state.
  */
-export function parseRecommendedLabel(label: string): {
-  label: string
-  recommended: boolean
-} {
-  const suffix =
-    /\s*(?:\((?:recommended|推荐)\)|（(?:recommended|推荐)）)\s*$/i
+export function parseRecommendedLabel(label: string): { label: string; recommended: boolean } {
+  const suffix = /\s*(?:\((?:recommended|推荐)\)|（(?:recommended|推荐)）)\s*$/i
   return suffix.test(label)
     ? { label: label.replace(suffix, ''), recommended: true }
     : { label, recommended: false }
@@ -101,12 +79,7 @@ interface AnswerFieldProps {
  */
 function AnswerField(props: AnswerFieldProps) {
   return (
-    <div
-      className={clsx(
-        css.field,
-        props.variant === 'inline' ? css.customInline : css.customBlock,
-      )}
-    >
+    <div className={clsx(css.field, props.variant === 'inline' ? css.customInline : css.customBlock)}>
       <div aria-hidden className={css.fieldMirror}>{`${props.value}\n`}</div>
       <textarea
         autoFocus={props.autoFocus}
@@ -140,55 +113,37 @@ function AnswerField(props: AnswerFieldProps) {
 export function QuestionComposer(props: QuestionComposerProps) {
   const question = props.matched
   const review = useMemo(() => planReviewOf(question.questions), [question])
-  return review === undefined ? (
-    <QuestionFlow
-      key={question.key}
-      pending={question}
-      t={props.t}
-      useStore={props.useStore}
-      actions={props.actions}
-    />
-  ) : (
-    <PlanReviewPanel
-      key={question.key}
-      pending={question}
-      review={review}
-      t={props.t}
-    />
-  )
+  return review === undefined
+    ? (
+      <QuestionFlow
+        key={question.key}
+        pending={question}
+        t={props.t}
+        useStore={props.useStore}
+        actions={props.actions}
+      />
+    )
+    : <PlanReviewPanel key={question.key} pending={question} review={review} t={props.t} />
 }
 
-type QuestionFlowProps = { pending: PendingQuestion } & Pick<
-  QuestionComposerProps,
-  't' | 'useStore' | 'actions'
->
+type QuestionFlowProps =
+  { pending: PendingQuestion } & Pick<QuestionComposerProps, 't' | 'useStore' | 'actions'>
 
 function QuestionFlow({ pending, t, useStore, actions }: QuestionFlowProps) {
   const questions = pending.questions
-  const markdownLabels = useMemo(
-    () => ({
-      code: { copyLabel: t('copy'), copiedLabel: t('copied') },
-      footnotes: t('markdown.footnotes'),
-    }),
-    [t],
-  )
-  const initialProgress = useMemo<QuestionDraftProgress>(
-    () => ({
-      index: 0,
-      drafts: questions.map(() => ({
-        selected: [],
-        custom: '',
-        skipped: false,
-      })),
-    }),
-    [questions],
-  )
-  const storedProgress = useStore(state =>
-    state.requestKey === pending.key &&
-    state.progress.drafts.length === questions.length
+  const markdownLabels = useMemo(() => ({
+    code: { copyLabel: t('copy'), copiedLabel: t('copied') },
+    footnotes: t('markdown.footnotes'),
+  }), [t])
+  const initialProgress = useMemo<QuestionDraftProgress>(() => ({
+    index: 0,
+    drafts: questions.map(() => ({ selected: [], custom: '', skipped: false })),
+  }), [questions])
+  const storedProgress = useStore(state => (
+    state.requestKey === pending.key && state.progress.drafts.length === questions.length
       ? state.progress
-      : undefined,
-  )
+      : undefined
+  ))
   const { index, drafts } = storedProgress ?? initialProgress
   const [busy, setBusy] = useState<'answer' | 'cancel' | null>(null)
   const [error, setError] = useState<Feedback | null>(null)
@@ -206,26 +161,18 @@ function QuestionFlow({ pending, t, useStore, actions }: QuestionFlowProps) {
   const draft = drafts[index]!
   const hasOptions = (question.options?.length ?? 0) > 0
 
-  const replaceProgress = (
-    nextIndex: number,
-    nextDrafts: QuestionDraftAnswer[],
-  ): void => {
+  const replaceProgress = (nextIndex: number, nextDrafts: QuestionDraftAnswer[]): void => {
     actions.replace(pending.key, { index: nextIndex, drafts: nextDrafts })
   }
 
   const cancelFlow = (): void => {
     setBusy('cancel')
     setError(null)
-    void pending
-      .cancel()
-      .then(() => {
-        actions.clear(pending.key)
-      })
+    void pending.cancel()
+      .then(() => { actions.clear(pending.key) })
       .catch((cause: unknown) => {
         setBusy(null)
-        setError({
-          text: cause instanceof Error ? cause.message : String(cause),
-        })
+        setError({ text: cause instanceof Error ? cause.message : String(cause) })
       })
   }
 
@@ -233,35 +180,27 @@ function QuestionFlow({ pending, t, useStore, actions }: QuestionFlowProps) {
     update: (current: QuestionDraftAnswer) => QuestionDraftAnswer,
     nextIndex = index,
   ): void => {
-    const nextDrafts = drafts.map((item, itemIndex) =>
-      itemIndex === index ? update(item) : item,
-    )
+    const nextDrafts = drafts.map((item, itemIndex) => itemIndex === index ? update(item) : item)
     replaceProgress(nextIndex, nextDrafts)
     setError(null)
   }
 
   const choose = (label: string): void => {
-    updateDraft(
-      (current) => {
-        if (question.multiSelect === true) {
-          const selected = current.selected.includes(label)
-            ? current.selected.filter(item => item !== label)
-            : [...current.selected, label]
-          return { ...current, selected, skipped: false }
-        }
-        return { selected: [label], custom: '', skipped: false }
-      },
-      question.multiSelect !== true && index < questions.length - 1
-        ? index + 1
-        : index,
-    )
+    updateDraft((current) => {
+      if (question.multiSelect === true) {
+        const selected = current.selected.includes(label)
+          ? current.selected.filter(item => item !== label)
+          : [...current.selected, label]
+        return { ...current, selected, skipped: false }
+      }
+      return { selected: [label], custom: '', skipped: false }
+    }, question.multiSelect !== true && index < questions.length - 1 ? index + 1 : index)
   }
 
   const answered = (item: QuestionDraftAnswer): boolean =>
     item.selected.length > 0 || item.custom.trim() !== ''
 
-  const completed = (item: QuestionDraftAnswer): boolean =>
-    answered(item) || item.skipped
+  const completed = (item: QuestionDraftAnswer): boolean => answered(item) || item.skipped
 
   const submitDrafts = (values: QuestionDraftAnswer[]): void => {
     const missing = values.findIndex(item => !completed(item))
@@ -277,24 +216,18 @@ function QuestionFlow({ pending, t, useStore, actions }: QuestionFlowProps) {
         const custom = value.custom.trim()
         return {
           id: item.id,
-          selected:
-            custom === '' || item.multiSelect === true ? value.selected : [],
+          selected: custom === '' || item.multiSelect === true ? value.selected : [],
           ...(custom === '' ? {} : { custom }),
         }
       }),
     }
     setBusy('answer')
     setError(null)
-    void pending
-      .answer(answer)
-      .then(() => {
-        actions.clear(pending.key)
-      })
+    void pending.answer(answer)
+      .then(() => { actions.clear(pending.key) })
       .catch((cause: unknown) => {
         setBusy(null)
-        setError({
-          text: cause instanceof Error ? cause.message : String(cause),
-        })
+        setError({ text: cause instanceof Error ? cause.message : String(cause) })
       })
   }
 
@@ -324,22 +257,17 @@ function QuestionFlow({ pending, t, useStore, actions }: QuestionFlowProps) {
     }))
   }
 
-  const continueFromCustom = (
-    event: KeyboardEvent<HTMLTextAreaElement>,
-  ): void => {
+  const continueFromCustom = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
     if (event.key !== 'Enter' || event.shiftKey || isComposing(event)) return
     event.preventDefault()
     continueFlow()
   }
 
   const skipQuestion = (): void => {
-    const nextDrafts = drafts.map((item, itemIndex) =>
-      itemIndex === index ? { selected: [], custom: '', skipped: true } : item,
-    )
-    replaceProgress(
-      index < questions.length - 1 ? index + 1 : index,
-      nextDrafts,
-    )
+    const nextDrafts = drafts.map((item, itemIndex) => itemIndex === index
+      ? { selected: [], custom: '', skipped: true }
+      : item)
+    replaceProgress(index < questions.length - 1 ? index + 1 : index, nextDrafts)
     setError(null)
     if (index < questions.length - 1) {
       return
@@ -355,41 +283,26 @@ function QuestionFlow({ pending, t, useStore, actions }: QuestionFlowProps) {
       >
         <header className={css.header}>
           <div className={css.headingBlock}>
-            {question.header !== undefined && (
-              <div className={css.eyebrow}>{question.header}</div>
-            )}
-            <h2
-              className={css.title}
-              id={`question-${pending.key}-${String(index)}`}
-            >
+            {question.header !== undefined && <div className={css.eyebrow}>{question.header}</div>}
+            <h2 className={css.title} id={`question-${pending.key}-${String(index)}`}>
               {question.question}
             </h2>
           </div>
           <div className={css.headerActions}>
             <button
-              type="button"
-              className={css.iconButton}
+              type="button" className={css.iconButton}
               aria-label={t(minimized ? 'nav.maximize' : 'nav.minimize')}
               title={t(minimized ? 'nav.maximize' : 'nav.minimize')}
               aria-expanded={!minimized}
               disabled={busy !== null}
-              onClick={() => {
-                setMinimized(current => !current)
-              }}
+              onClick={() => { setMinimized(current => !current) }}
             >
-              {minimized ? (
-                <IconChevronUpOutline14 />
-              ) : (
-                <IconChevronDownOutline14 />
-              )}
+              {minimized ? <IconChevronUpOutline14 /> : <IconChevronDownOutline14 />}
             </button>
             <button
-              type="button"
-              className={css.iconButton}
-              aria-label={t('nav.cancel')}
+              type="button" className={css.iconButton} aria-label={t('nav.cancel')}
               title={t('nav.cancel')}
-              disabled={busy !== null}
-              onClick={cancelFlow}
+              disabled={busy !== null} onClick={cancelFlow}
             >
               <IconCloseOutline16 />
             </button>
@@ -400,73 +313,42 @@ function QuestionFlow({ pending, t, useStore, actions }: QuestionFlowProps) {
           <>
             <div className={css.body} data-question-scroll>
               {question.detail !== undefined && (
-                <div className={css.detail}>
-                  <MarkdownText
-                    text={question.detail}
-                    labels={markdownLabels}
-                  />
-                </div>
+                <div className={css.detail}><MarkdownText text={question.detail} labels={markdownLabels} /></div>
               )}
-              <div
-                className={css.options}
-                role={question.multiSelect === true ? 'group' : 'radiogroup'}
-              >
+              <div className={css.options} role={question.multiSelect === true ? 'group' : 'radiogroup'}>
                 {(question.options ?? []).map((option, optionIndex) => {
                   const selected = draft.selected.includes(option.label)
                   const display = parseRecommendedLabel(option.label)
                   return (
                     <button
-                      type="button"
-                      key={`${option.label}-${String(optionIndex)}`}
-                      className={clsx(
-                        css.option,
-                        selected &&
-                          question.multiSelect !== true &&
-                          css.optionSelected,
-                      )}
-                      role={
-                        question.multiSelect === true ? 'checkbox' : 'radio'
-                      }
+                      type="button" key={`${option.label}-${String(optionIndex)}`}
+                      className={clsx(css.option, selected && question.multiSelect !== true && css.optionSelected)}
+                      role={question.multiSelect === true ? 'checkbox' : 'radio'}
                       aria-checked={selected}
                       aria-label={display.label}
                       disabled={busy !== null}
-                      onClick={() => {
-                        choose(option.label)
-                      }}
+                      onClick={() => { choose(option.label) }}
                       onKeyDown={(event) => {
-                        if (event.key !== 'Enter' || !drafts.every(completed))
-                          return
+                        if (event.key !== 'Enter' || !drafts.every(completed)) return
                         event.preventDefault()
                         submitDrafts(drafts)
                       }}
                     >
-                      {question.multiSelect === true ? (
-                        <span
-                          className={clsx(
-                            css.checkbox,
-                            selected && css.checkboxChecked,
-                          )}
-                          aria-hidden="true"
-                        >
-                          {selected && <IconCheckOutline14 size={12} />}
-                        </span>
-                      ) : (
-                        <span className={css.number}>{optionIndex + 1}</span>
-                      )}
+                      {question.multiSelect === true
+                        ? (
+                          <span className={clsx(css.checkbox, selected && css.checkboxChecked)} aria-hidden="true">
+                            {selected && <IconCheckOutline14 size={12} />}
+                          </span>
+                        )
+                        : <span className={css.number}>{optionIndex + 1}</span>}
                       <span className={css.optionCopy}>
                         <span className={css.optionLine}>
-                          <span className={css.optionLabel}>
-                            {display.label}
-                          </span>
+                          <span className={css.optionLabel}>{display.label}</span>
                           {display.recommended && (
-                            <span className={css.badge}>
-                              {t('option.recommended')}
-                            </span>
+                            <span className={css.badge}>{t('option.recommended')}</span>
                           )}
                           {option.description !== undefined && (
-                            <span className={css.description}>
-                              {option.description}
-                            </span>
+                            <span className={css.description}>{option.description}</span>
                           )}
                         </span>
                       </span>
@@ -474,111 +356,80 @@ function QuestionFlow({ pending, t, useStore, actions }: QuestionFlowProps) {
                   )
                 })}
 
-                {hasOptions ? (
-                  <div
-                    className={clsx(
-                      css.customRow,
-                      draft.custom !== '' && css.customRowActive,
-                    )}
-                  >
-                    {question.multiSelect === true ? (
-                      <span
-                        className={clsx(
-                          css.checkbox,
-                          draft.custom !== '' && css.checkboxChecked,
+                {hasOptions
+                  ? (
+                    <div className={clsx(css.customRow, draft.custom !== '' && css.customRowActive)}>
+                      {question.multiSelect === true
+                        ? (
+                          <span
+                            className={clsx(css.checkbox, draft.custom !== '' && css.checkboxChecked)}
+                            aria-hidden="true"
+                          >
+                            {draft.custom !== '' && <IconCheckOutline14 size={12} />}
+                          </span>
+                        )
+                        : (
+                          <span className={css.number} aria-hidden="true">
+                            <IconEditOutline16 size={12} />
+                          </span>
                         )}
-                        aria-hidden="true"
-                      >
-                        {draft.custom !== '' && (
-                          <IconCheckOutline14 size={12} />
-                        )}
-                      </span>
-                    ) : (
-                      <span className={css.number} aria-hidden="true">
-                        <IconEditOutline16 size={12} />
-                      </span>
-                    )}
+                      <AnswerField
+                        variant="inline"
+                        value={draft.custom}
+                        disabled={busy !== null}
+                        placeholder={t('custom.placeholder')}
+                        onChange={draftCustom}
+                        onKeyDown={continueFromCustom}
+                      />
+                    </div>
+                  )
+                  : (
                     <AnswerField
-                      variant="inline"
+                      autoFocus={!focusedQuestions.current.has(index)}
+                      variant="block"
                       value={draft.custom}
                       disabled={busy !== null}
                       placeholder={t('custom.placeholder')}
+                      onFocus={() => { focusedQuestions.current.add(index) }}
                       onChange={draftCustom}
                       onKeyDown={continueFromCustom}
                     />
-                  </div>
-                ) : (
-                  <AnswerField
-                    autoFocus={!focusedQuestions.current.has(index)}
-                    variant="block"
-                    value={draft.custom}
-                    disabled={busy !== null}
-                    placeholder={t('custom.placeholder')}
-                    onFocus={() => {
-                      focusedQuestions.current.add(index)
-                    }}
-                    onChange={draftCustom}
-                    onKeyDown={continueFromCustom}
-                  />
-                )}
+                  )}
               </div>
             </div>
 
             <footer className={css.footer}>
               <div className={css.pager}>
                 <button
-                  type="button"
-                  className={css.iconButton}
-                  aria-label={t('nav.prev')}
+                  type="button" className={css.iconButton} aria-label={t('nav.prev')}
                   disabled={index === 0 || busy !== null}
-                  onClick={() => {
-                    replaceProgress(index - 1, drafts)
-                    setError(null)
-                  }}
+                  onClick={() => { replaceProgress(index - 1, drafts); setError(null) }}
                 >
                   <IconChevronLeftOutline14 />
                 </button>
-                <span className={css.progress}>
-                  {index + 1} / {questions.length}
-                </span>
+                <span className={css.progress}>{index + 1} / {questions.length}</span>
                 <button
-                  type="button"
-                  className={css.iconButton}
-                  aria-label={t('nav.next')}
+                  type="button" className={css.iconButton} aria-label={t('nav.next')}
                   disabled={index === questions.length - 1 || busy !== null}
-                  onClick={() => {
-                    replaceProgress(index + 1, drafts)
-                    setError(null)
-                  }}
+                  onClick={() => { replaceProgress(index + 1, drafts); setError(null) }}
                 >
                   <IconChevronRightOutline14 />
                 </button>
               </div>
               <div className={css.feedback} role="status">
-                {error === null
-                  ? null
-                  : 'key' in error
-                    ? t(error.key)
-                    : error.text}
+                {error === null ? null : 'key' in error ? t(error.key) : error.text}
               </div>
               <div className={css.footerActions}>
-                <Button
-                  variant="outline"
-                  disabled={busy !== null}
-                  onClick={skipQuestion}
-                >
+                <Button variant="outline" disabled={busy !== null} onClick={skipQuestion}>
                   {t('action.skip')}
                 </Button>
                 <Button
                   variant="primary"
-                  disabled={busy !== null || !answered(draft)}
-                  onClick={continueFlow}
+                  disabled={busy !== null || !answered(draft)} onClick={continueFlow}
                 >
                   {busy === 'answer'
                     ? t('submitting')
-                    : index === questions.length - 1
-                      ? t('submit')
-                      : t('action.next')}
+                    : index === questions.length - 1 ? t('submit') : t('action.next')}
                 </Button>
               </div>
             </footer>

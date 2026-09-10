@@ -449,16 +449,6 @@ export type SurfaceIntent<T extends SurfaceEventType = SurfaceEventType> = {
   sourceEventSeqs?: SessionSeq[]
 })
 
-/** Append-only extras accepted by {@link Session.append}. */
-export interface SessionAppendOptions {
-  /**
-   * Mark a plugin-owned event ignorable so harnesses that do not know this
-   * event type skip it instead of rejecting the whole log. Redundant for
-   * surface events, which are already part of the core vocabulary.
-   */
-  ignorable?: true
-}
-
 /**
  * One immutable entry in the session log.
  *
