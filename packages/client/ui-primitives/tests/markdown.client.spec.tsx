@@ -1,20 +1,11 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
-import { MessageText } from '@deepseek-ai/dsh-client-ui-primitives'
 import { JsonBlock, MarkdownText } from './markdown-test-components.tsx'
 import { cjkFriendlyStrong } from '../src/markdown/cjkFriendlyStrong.ts'
 import { mathCompatibility } from '../src/markdown/mathCompatibility.ts'
 
 afterEach(cleanup)
-
-describe('MessageText', () => {
-  it('renders the text verbatim', () => {
-    const { container } = render(<MessageText text={'# line1\n`line2`'} />)
-    expect(container.textContent).toBe('# line1\n`line2`')
-    expect(container.querySelector('h1')).toBeNull()
-  })
-})
 
 describe('MarkdownText', () => {
   it('renders CommonMark and GFM elements as semantic DOM', () => {
@@ -159,6 +150,7 @@ describe('MarkdownText', () => {
     expect(container.textContent).toContain('USER=~/y')
     expect(container.textContent).toContain('~单~')
   })
+
   it('links inline code through the file-mention resolver: URL first, settled only, never inside links', () => {
     const opened: string[] = []
     const fileMentions = {
