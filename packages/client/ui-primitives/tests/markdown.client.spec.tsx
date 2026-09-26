@@ -150,6 +150,8 @@ describe('MarkdownText', () => {
     expect(container.textContent).toContain('HOME=~/x')
     expect(container.textContent).toContain('USER=~/y')
     expect(container.textContent).toContain('~单~')
+  })
+
   it('delegates ordinary HTTP(S) clicks while preserving modified-click behavior', () => {
     const openExternalLink = vi.fn<(href: string) => void>()
     render(
